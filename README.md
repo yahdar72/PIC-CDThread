@@ -10,6 +10,8 @@ One of the key of this scheduler is that is statically configurable (no dynamic 
  CDEvents and CDmessages, so directly at compile time is possible evaluate the memory footprint. Also the scheduler is very simple 
  and could be recoded to solve different application constrain.
  
+At today I have used it in many project but there is a great problem with documentation that is not updated and present in a separated document. In the fact the only documentation is in the initial part of the header, and some source, file. Please se the cdthread.h to understand how the code work
+
 Told this ...good work
  
  
