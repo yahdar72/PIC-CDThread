@@ -6,9 +6,10 @@
 //// without written permission.                                        ////
 ////                                                                    ////
 //// Author: Dario Cortese                                              ////
-//// Client: myself                                                     ////
+//// Client: Mongoose srl (Mariano Cerbone)                             ////
 //// User: Dario Cortese                                                ////
 //// Created on 08/05/2013  modified 04-11-2015                         ////
+//// Modify on 10/02/2019 to be adapted at CCS compiler                 ////
 //// File: cdRoundstream.h                                              ////
 //// Description:                                                       ////
 ////    This file has the variable, structure and function definition   ////
@@ -210,13 +211,21 @@ typedef struct CDRStream_struct_tag{
 	//int autoFlush;		//!< boolean that indicates if reset counter when there isn't vals to be read (all vals read)
  }CDRStream_t;
 
-#define CDRSTREAMERR_NO_ERROR	 0x0000
-#define CDRSTREAMERR_UNITIALIZED 0x0001
-#define CDRSTREAMERR_READ_EMPTY	 0x0002
-#define CDRSTREAMERR_OVERWRITE	 0x0004
+ 
+//CDRStream_t.errors defines 
+#define CDRSTREAMERR_UNITIALIZED  0x0000
+#define CDRSTREAMERR_NO_ERROR	  0x0001
+#define CDRSTREAMERR_READ_EMPTY	  0x0002
+#define CDRSTREAMERR_OVERWRITE	  0x0004
+#define CDRSTREAMERR_BADPTRBUFF	  0x0008
+#define CDRSTREAMERR_BADBUFFSIZE  0x0010
 
- 
- 
+//for read error, active only CDRSTREAMERR_BADPTRBUFF, CDRSTREAMERR_BADBUFFSIZE, CDRSTREAMERR_OVERWRITE 
+//remember that result of this mask must be equal to CDRSTREAMERR_UNITIALIZED
+#define CDRSTREAMERR_ERRMASKWRITE 0x001D
+//for read error, active only CDRSTREAMERR_BADPTRBUFF, CDRSTREAMERR_BADBUFFSIZE, CDRSTREAMERR_READ_EMPTY
+//remember that result of this mask must be equal to CDRSTREAMERR_UNITIALIZED
+#define CDRSTREAMERR_ERRMASKREAD  0x001B 
 
 sint_t cdRStreamInit(CDRStream_t* pStream, CDRStream_data_t* pPtrBuff, CDRStream_counters_t pBuffSize);	//!< initialize the streamer data (and structure)
  
@@ -248,51 +257,51 @@ sint_t UINT8tocdRStream(CDRStream_t* cds, uint8_t pByte);       //!< add one val
 
 
 
-/*-! \def cdRStreamLastReadVal(xx)
+/*-! \def cdRStreamLastReadVal(xYx)
 	reads last read value from the function getval and pregetval
-	\n Param xx is pStream pointer to CDstream (data structure)
+	\n Param xYx is pStream pointer to CDstream (data structure)
 */
-//#define cdRStreamLastReadVal(xx) (((CDRStream_struct*)(xx))->lastReadValue)
+//#define cdRStreamLastReadVal(xYx) (((CDRStream_struct*)(xYx))->lastReadValue)
 
 
-/*! \def cdRStreamAllReadings(xx)
+/*! \def cdRStreamAllReadings(xYx)
 	reads the number of values read from stream initialization
-	\n Param xx is pStream pointer to CDstream (data structure)
+	\n Param xYx is pStream pointer to CDstream (data structure)
 */
-#define cdRStreamAllReadings(xx) (((CDRStream_struct*)(xx))->Readings)
+#define cdRStreamAllReadings(xYx) (((CDRStream_struct*)(xYx))->Readings)
 
-/*! \def cdRStreamAllWritings(xx)
+/*! \def cdRStreamAllWritings(xYx)
 	reads the number of values read from stream initialization
-	\n Param xx is pStream pointer to CDstream (data structure)
+	\n Param xYx is pStream pointer to CDstream (data structure)
 */
-#define cdRStreamAllWritings(xx) (((CDRStream_struct*)(xx))->Writings)
+#define cdRStreamAllWritings(xYx) (((CDRStream_struct*)(xYx))->Writings)
 
 
-/*! \def cdRStreamGetSize(xx)
+/*! \def cdRStreamGetSize(xYx)
 	return the size of stream buffer in number of storable Vals (int16)
-	\n Param xx is pStream pointer to CDstream (data structure)
+	\n Param xYx is pStream pointer to CDstream (data structure)
 */
-#define cdRStreamGetSize(xx) (((CDRStream_struct*)(xx))->buffSize)
+#define cdRStreamGetSize(xYx) (((CDRStream_struct*)(xYx))->buffSize)
 
 
 //void cdstreamBlockRead(CDRStream_struct* pStream, int pBlock);	//!< block or re-enable the read for stream
-/*!	\def cdRStreamBlockRead(xx,yy)
+/*!	\def cdRStreamBlockRead(xYx,yXy)
 	If set block = true then when ask number of readable vals it always return 0 regardless of the reality, and
 	 if you attempt to read a value from stream it will generate an error.
-	\n When block is removed (yy =false) then the available byte in stream to be read is the reality.
-	\n When block is active (yy=true), is possible to write data in the stream without any error, but is impossible to read
+	\n When block is removed (yXy =false) then the available byte in stream to be read is the reality.
+	\n When block is active (yXy=true), is possible to write data in the stream without any error, but is impossible to read
 	   values or ask number of readable vals in stream.
-	\n Param xx is pStream pointer to CDstream (data structure)
-	\n Param yy is a boolean (int) with value true or false
+	\n Param xYx is pStream pointer to CDstream (data structure)
+	\n Param yXy is a boolean (int) with value true or false
 */
-#define cdRStreamBlockRead(xx,yy) ((CDRStream_struct*)(xx))->blockRead=(yy)
+#define cdRStreamBlockRead(xYx,yXy) ((CDRStream_struct*)(xYx))->blockRead=(yXy)
 
 
-/*! \def cdRStreamIsBlockedRead(xx)
+/*! \def cdRStreamIsBlockedRead(xYx)
 	indicates if stream reading is blocked (return true) or enabled (return false)
-	\n Param xx is pStream pointer to CDstream (data structure)
+	\n Param xYx is pStream pointer to CDstream (data structure)
 */
-#define cdRStreamIsBlockedRead(xx) (((CDRStream_struct*)(xx))->blockRead)
+#define cdRStreamIsBlockedRead(xYx) (((CDRStream_struct*)(xYx))->blockRead)
 
 
 

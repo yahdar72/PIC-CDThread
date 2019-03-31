@@ -6,8 +6,9 @@
 //// without written permission.                                        ////
 ////                                                                    ////
 //// Author: Dario Cortese                                              ////
-//// Client: I.S.A. srl                                                 ////
-//// Created on 02/08/2012 modified 2015-11-04                          ////
+//// Client: Mongoose srl (Mariano Cerbone)                             ////
+//// Created on 02/08/2012                                              ////
+//// Modify on 10/02/2019 to be adapted at CCS compiler                 ////
 //// File: cdthread.h                                                   ////
 //// Description:                                                       ////
 ////    This file has the variable, structure and function definition   ////
@@ -61,7 +62,7 @@
 ////   THREAD, AND IN THIS CASE THE THREAD ENGINE SKIPS THEIR ANALYSYS  ////
 ////   AND EXECUTION.                                                   ////
 //// To create and register a new thread for engine use...              ////
-////   cdThreadID_t ThreadID= CDTHREADID_NOTHREAD;                        ////
+////   cdThreadID_t ThreadID= CDTHREADID_NOTHREAD;                      ////
 ////   int allOk; //to know if callfunction was called                  ////
 ////   allOk = cdthread_new(&ThreadID, functionForThread);              ////
 //// To create and register a new thread for user (not used in engine)  ////
@@ -77,7 +78,7 @@
 ////   allOk = cdthread_changeFunction(ThreadID, FunctionForThread);    ////
 //// To call by user code a user managed thread (or a engined thread)   ////
 ////   use...                                                           ////
-////   int fctExitCode;   //used to know exit code of callback function   ////
+////   int fctExitCode;   //used to know exit code of callback function ////
 ////   int allOk; //to know if callfunction was called                  ////
 ////   allOk = cdthread_UserCallThreadFunction(ThreadID, &fctExitCode); ////
 ////                                                                    ////
@@ -89,7 +90,7 @@
 ////   cdthread_DestroyThread( &ThreadID);                              ////
 ////                                                                    ////
 //// To check if ThreadID refers to a destroyed thread use..            ////
-////   int isKo; //to know if destroyed, true=destroyed, false=exist      ////
+////   int isKo; //to know if destroyed, true=destroyed, false=exist    ////
 ////   isKo = cdthread_isDestroyed(ThreadID);                           ////
 ////                                                                    ////
 //// To check if ThreadID exist (valid and thread not destroyed)        ////
@@ -103,7 +104,7 @@
 ////   int Priority = CDTHREADPRIORITY_ENABLED; //lower enabled priority////
 ////   allOk = cdthread_Enable(ThreadID, Priority);                     ////
 //// To disable thread use ...                                          ////
-////   allOk = cdthread_Disable(cdThreadID_t pThId);                      ////
+////   allOk = cdthread_Disable(cdThreadID_t pThId);                    ////
 ////                                                                    ////
 //// To know if thread is enabled use the function....                  ////
 ////  cdthread_isEnabled(ThreadID) that return a true if enabled        ////
@@ -142,9 +143,9 @@
 ////                                                                    ////
 //// TO CREATE A NEW MESSAGE FOR A SPECIFIC THREAD USE...               ////
 ////   cdMessageID msgID;                                               ////
-////   int info= 1;   //this is the code for message used inside      ////
+////   int info= 1;   //this is the code for message used inside        ////
 ////                    //the thread to determine which message is      ////
-////   int NumData=10;   //this is the number (logical, not the size in  ////
+////   int NumData=10;   //this is the number (logical, not the size in ////
 ////                    //byte) of data                                 ////
 //// IS VERY IMPORTANT THAT DATA DON'T STAY IN STACK OR VOLATILE ZONE   ////
 //// BECAUSE DATA AREN'T COPIED IN THE MESSAGE, BUT ONLY A POINTER IS   ////
@@ -163,8 +164,8 @@
 ////                                         is one or more messages    ////
 //// TO READ THE MESSAGE ID, AND SO READS ITS DATA, INSIDE THE THREAD   ////
 ////   FUNCTION use...                                                  ////
-////   cdMessageID msgID;                                             ////
-////   msgID = cdthread_getMessage(ThisThread);                       ////
+////   cdMessageID msgID;                                               ////
+////   msgID = cdthread_getMessage(ThisThread);                         ////
 //// IT SIGN ALSO THE MESSAGE AS READED, SO EXTERNALLY COULD BE DETECTED////
 //// To detect externally to thread function the happened read message..////
 ////   cdmessage_isReaded(msgID); //msgID returned when created the msg,////
@@ -222,7 +223,7 @@
 ////                                                                    ////
 //// int ThreadFunctionSample(int firstTime, cdThreadID_t ThisThread, ..////
 ////                          int prevExitCode){                        ////
-//// ....}                                                              ////
+//// ....}                                                             ////
 ////                                                                    ////
 //// THE THREAD FUNCTION MUST RETURN A VALUE THAT IS EXIT STATUS; THIS  ////
 ////   PREVIOUS STATUS MUST BE READED BY THREAD FUNCTION, SO IT CAN     ////
@@ -258,7 +259,7 @@
 //// cdTimerID myTimer1, myTimer2, myTimer3, myTimer4;                  ////
 //// myTimer1 = cdtimer_setupTicks(20);  //timer value for wait 20ticks ////
 //// myTimer2 = cdtimer_setup_s(1);     //timer value for wait 1second  ////
-//// myTimer3 = cdtimer_setupms(10);     //timer value for wait 10ms    ////
+//// myTimer3 = cdtimer_setup_ms(10);     //timer value for wait 10ms    ////
 //// myTimer4 = cdtimer_setupus(50);     //timer value for wait 50us    ////
 //// while( cdtimer_isNotExpired(myTimer1) ){                           ////
 ////   ....                                                             ////
@@ -274,7 +275,7 @@
 ////   static cdTimerID myTimer1=0;                                     ////
 ////   if( myTimer1!=0 ) goto LABEL_timer_here;                         //// 
 ////   //place here code to execute before start timer                  ////
-////   myTimer1 = cdtimer_setupms(1); //timer value for wait 1ms        ////
+////   myTimer1 = cdtimer_setup_ms(1); //timer value for wait 1ms        ////
 //// LABEL_timer_here:                                                  //// 
 ////   if( cdtimer_isNotExpired(myTimer1) ) return 0;                   ////
 ////   //place here code to execute when timer expired                  ////
@@ -364,30 +365,34 @@ LABEL_STATE3:
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef _CDTHREAD_H_
-#define _CDTHREAD_H_
+#ifndef __CDTHREAD_H__
+#define __CDTHREAD_H__
 
 #include "CD_types.h"
 
 /*! \def CDTHREAD_MAX_NUM_THREADS
    used to indicates the absolute maximun number of thread that the system could have (thread array size)
+   \n Remember that one is reserved for thread_alwais (logical ID 1 or thread array index 0)  
 */
-#define  CDTHREAD_MAX_NUM_THREADS   5
+#define  CDTHREAD_MAX_NUM_THREADS   16
 
 /*! \def CDTHREAD_MAX_NUM_MESSAGES
    used to indicates the absolute maximun number of messages that the system could have (thread array size)
 */
-#define  CDTHREAD_MAX_NUM_MESSAGES   8
+#define  CDTHREAD_MAX_NUM_MESSAGES   24
 
 //cdMessageID_t, always signed, but on 8bit platform means 127 messages maximun, on 16bit platform means 32767 messages maximun and so on
-typedef sint_t cdMessageID_t;   //!< cdmessage id type, used to store id message that is used by every function
+//sint16_t needed for a problem of ccs in array offset calculation, probably for optimization code use index of array for offset calculation, 
+// so if offset is > than 128 an error happen; this is enormous error but today solve it changing the ID
+typedef sint16_t cdMessageID_t;   //!< cdmessage id type, used to store id message that is used by every function
 typedef sint_t cdMsgInfo_t;     //!< message info type, used to store info value associated to the message
 typedef sint16_t cdMsgData_t;   //!< message data, used to store the a data (because this could be a memory pointer (casting to void*) this must be almost the size of a pointer [16bit for less than 65535 address space or a 32bit])
 
 //on 8 bit platform means 127 threads
 //on 16bit platororm means 32767 threads
-typedef sint_t cdThreadID_t ;   //!< cdthread id type, used to store id message that is used by every function
-
+//sint16_t needed for a problem of ccs in array offset calculation, probably for optimization code use index of array for offset calculation, 
+// so if offset is > than 128 an error happen; this is enormous error but today solve it changing the ID
+typedef sint16_t cdThreadID_t ;   //!< cdthread id type, used to store id message that is used by every function
 
 //*********************************************************************
 //*************messages************************************************
@@ -396,7 +401,7 @@ typedef sint_t cdThreadID_t ;   //!< cdthread id type, used to store id message 
 
 
 
-typedef struct cdMessageStruct_tag{
+typedef struct {
    cdThreadID_t cdthID ;    //!< a number that identify unequivocal to which thread is associated this message
    int State;           //!< 2=new message, 1=readed but do not delete, 0=was managed and so is deletable 
    //void* ptrData;        //!< pointer to memory where is stored data for this message
@@ -406,6 +411,13 @@ typedef struct cdMessageStruct_tag{
    cdThreadID_t cdthSenderID ;    //!< a number that identify unequivocal to which thread is sender of this message
 }cdmessageStruct;
 
+typedef struct {
+   cdMessageID_t actMsg;        //!< actual message ID, remember to set at CDMESSAGEID_ERROR after message destroy
+   cdMsgData_t  msgData;        //!< the data of the message (because could be a memory pointer (casting to void*) this must be almost the size of a memory pointer [16bit for less than 65535 address space or a 32bit])
+   cdMsgInfo_t  msgInfo;        //!< a information value, is optional and is a user value used to inform receiver
+   cdThreadID_t msgSender ;     //!< a number that identify unequivocal to which thread is sender of this message
+}cdmessageData_t;
+
 
 
 /*!   \var cdmessageStruct cdmessagesSystemArray
@@ -414,13 +426,16 @@ typedef struct cdMessageStruct_tag{
 extern cdmessageStruct cdmessagesSystemArray[CDTHREAD_MAX_NUM_MESSAGES];
 
 
-
-
-
 /*! \def CDMESSAGEDATA_NODATA
    used in cdmessageStruct.ptrData to assign a no available pointer to data
 */
-#define CDMESSAGEDATA_NODATA      (void*)0x00000000
+#define CDMESSAGEDATA_NODATA         0x00000000
+
+/*! \def CDMESSAGEDATA_NODATAPTR
+   used in cdmessageStruct.ptrData to assign a no available pointer to data
+*/
+#define CDMESSAGEDATA_NODATAPTR      (void*)0x00000000
+
 
 
 
@@ -452,14 +467,14 @@ extern cdmessageStruct cdmessagesSystemArray[CDTHREAD_MAX_NUM_MESSAGES];
 /*! \def cdmessage_isErrorID(x)
    macro used to check if cdMessageID 'x' is an error id (==CDMESSAGEID_ERROR)
 */
-#define cdmessage_isErrorID(x)      ( x == CDMESSAGEID_ERROR)
+#define cdmessage_isErrorID( YxY )      ( YxY == CDMESSAGEID_ERROR)
 
 
 /*! \def cdmessage_checkValidID(x)
    checks if cdMessageID 'x' is a valid ID, this means that isn't a CDMESSAGEID_ERROR and is inside from 0 to CDTHREAD_MAX_NUM_MESSAGES.
    \n return true if is valid otherwisw return false
 */
-#define cdmessage_checkValidID( YY )   (( YY !=CDMESSAGEID_ERROR)&&( YY >=0)&&( YY <=CDTHREAD_MAX_NUM_MESSAGES))
+#define cdmessage_checkValidID( YxY )   (( YxY !=CDMESSAGEID_ERROR)&&( YxY >=0)&&( YxY <=CDTHREAD_MAX_NUM_MESSAGES))
 
 
 
@@ -471,28 +486,30 @@ cdMessageID_t cdmessage_getFreeID(); //!< searh free/available position in syste
 cdMessageID_t cdmessage_getArrayIdxFromID(cdMessageID_t pMsgId); //!< returns the real index for cdmessagesSystemArray extracted from indicated cdMessageID (pMsgId)
 
 cdMessageID_t cdmessage_new(cdThreadID_t pThreadIDdest, cdMsgInfo_t pInfoVal, cdMsgData_t pData, cdThreadID_t pThreadIDorg ); //!< creates new message, and adds it to message queue of indicated thread
-#inline cdMessageID_t cdmessage_new_DataPtr(cdThreadID_t pThreadIDdest, cdMsgInfo_t pInfoVal, void* ptrData, cdThreadID_t pThreadIDorg ); //!< creates new message with a pointer to data, and adds it to message queue of indicated thread
-int cdmessage_deleteMsg( cdMessageID_t pMsgId );           //!< delete  this message from messages system array and remove it from message queue of connected thread (only if is the first msg of queue)
+//#inline cdMessageID_t cdmessage_new_DataPtr(cdThreadID_t pThreadIDdest, cdMsgInfo_t pInfoVal, void* ptrData, cdThreadID_t pThreadIDorg ); //!< creates new message with a pointer to data, and adds it to message queue of indicated thread
+//remenber: data pointed by ptrData must be static or global otherwise the reader will read wrong and unpredictable data
+cdMessageID_t cdmessage_new_DataPtr(cdThreadID_t pThreadIDdest, cdMsgInfo_t pInfoVal, void* ptrData, cdThreadID_t pThreadIDorg ); //!< creates new message with a pointer to data, and adds it to message queue of indicated thread
+sint_t cdmessage_deleteMsg( cdMessageID_t pMsgId );           //!< delete  this message from messages system array and remove it from message queue of connected thread (only if is the first msg of queue)
 
 
-int cdmessage_deleteAllMsgWithThreadID( cdThreadID_t pThId ); //!< delete  all messages in the message system array that have cdthID equal pThId
+sint_t cdmessage_deleteAllMsgWithThreadID( cdThreadID_t pThId ); //!< delete  all messages in the message system array that have cdthID equal pThId
 
-int cdmessage_sigMsgAsReaded( cdMessageID_t pMsgId );   //!< sign this message as readed, if action has success then return true
+sint_t cdmessage_sigMsgAsReaded( cdMessageID_t pMsgId );   //!< sign this message as readed, if action has success then return true
 
-int cdmessage_isReaded( cdMessageID_t pMsgId );         //!< checks if this message was readed and returns true, this means that could be only readed or yet deleted; returns false also an error happen
-int cdmessage_isDeleted( cdMessageID_t pMsgId );        //!< check if this message was deleted and return true otherwise return false (also an error happen)
-cdMsgData_t cdmessage_getData( cdMessageID_t pMsgId );       //!< return the number of logical data attached to message; if there isn't, or an error happens, return 0
-void* cdmessage_getDataPointer( cdMessageID_t pMsgId ); //!< return pointer to memory where is the data attached to indicated message; if there isn't, or an error happens, return CDMESSAGEDATA_NODATA
-cdMsgInfo_t cdmessage_getInfo( cdMessageID_t pMsgId );          //!< return the info value for indicated message
-cdThreadID_t cdmessage_getSenderThread( cdMessageID_t pMsgId ); //!< return the cdThreadID of Thread that has sent the message; if there isn't, or an error happens, return CDTHREADID_ERROR
+sint_t cdmessage_isReaded( cdMessageID_t pMsgId );         //!< checks if this message was readed and returns true, this means that could be only readed or yet deleted; returns false also an error happen
+sint_t cdmessage_isDeleted( cdMessageID_t pMsgId );        //!< check if this message was deleted and return true otherwise return false (also an error happen)
+//cdMsgData_t cdmessage_getData( cdMessageID_t pMsgId );       //!< return the number of logical data attached to message; if there isn't, or an error happens, return 0
+//void* cdmessage_getDataPointer( cdMessageID_t pMsgId ); //!< return pointer to memory where is the data attached to indicated message; if there isn't, or an error happens, return CDMESSAGEDATA_NODATA 
+//cdMsgInfo_t cdmessage_getInfo( cdMessageID_t pMsgId );          //!< return the info value for indicated message
+//cdThreadID_t cdmessage_getSenderThread( cdMessageID_t pMsgId ); //!< return the cdThreadID of Thread that has sent the message; if there isn't, or an error happens, return CDTHREADID_ERROR 
 
 
 //*********************************************************************
 //*************thread *************************************************
 //*********************************************************************
 
-//! function pointer to the thread code, return the exit state (int) and has two param, first is 'first time' boolean (int), second is a cdThreadID of calling thread
-typedef int (*cdtreadFunctionType)(int, cdThreadID_t , int ); //
+//! function pointer to the thread code, return the exit state (sint_t) and has two param, first is 'first time' boolean (sint_t), second is a cdThreadID of calling thread
+typedef sint_t (*cdtreadFunctionType)(sint_t, cdThreadID_t, sint_t); //
 
 //this is struct type to manages thread
 typedef struct cdthreadStruct_tag{
@@ -500,34 +517,35 @@ typedef struct cdthreadStruct_tag{
    int Priority;                //!< 0 means disabled, 1 or more indicates that is enabled and the priority level (higher value-> higher priority) 
    int Wakeup;                  //!< 0 means disabled, 1 = enable thread when MessagesCounter become >0, 2 or more to be defined in the future
    cdtreadFunctionType cdtreadFunction;//!< function pointer to the thread code, return the exit state (int) and has two param, first is 'first time' boolean (int), second is a cdThreadID of calling thread
-   int LastExitState;            //!< indicates the returned value when exiting from *cdtreadFunction; usefull when reenter to know last state.
-   int isTheFirstTime;             //!< boolean, if true indicates that is the first time that the cdtreadFunction is called.
+   sint_t LastExitState;            //!< indicates the returned value when exiting from *cdtreadFunction; usefull when reenter to know last state.
+   sint_t isTheFirstTime;             //!< boolean, if true indicates that is the first time that the cdtreadFunction is called.
    cdMessageID_t MessagesCounter;   //!< indicates the number of messages available for this thread; 0 means no msg. The queue is LIFO type
-   cdMessageID_t FirstMsgID;        //!< msgid of first message; if -1 means no messages
-   cdMessageID_t LastMsgID;         //!< msgid of last available message; if -1 means no messages
-
-}cdthreadStruct;
+   cdMessageID_t FirstMsgID;         //!< msgid of first message; if -1 means no messages 
+   cdMessageID_t LastMsgID;         //!< msgid of last available message; if -1 means no messages 
+   char LogName[4];                 //!< logical name
+} cdThreadStruct_t;
 
 
 
 /*!   \var cdthreadStruct cdthreadsSystemArray
     is the system array that stores the cdthread structure used to manage threads
 */
-extern cdthreadStruct cdthreadsSystemArray[CDTHREAD_MAX_NUM_THREADS];
+extern cdThreadStruct_t cdthreadsSystemArray[CDTHREAD_MAX_NUM_THREADS];
 
 
+#define  CDTHREAD_ALWAYSTHREAD_INDEX   0
 
 
 
 /*!   \var cdThreadID_t LASTCALLEDTHREADIDBYENGINE
     used to inform extern code which is the last executed thread function called by thread_engine
 */
-extern cdThreadID_t LASTCALLEDTHREADIDBYENGINE;
+extern cdThreadID_t LASTCALLEDTHREADIDBYENGINE; 
 
 /*!   \var cdThreadID_t LASTCALLEDTHREADIDBYUSER
     advise external code which is the last called thread by user
 */
-extern cdThreadID_t LASTCALLEDTHREADIDBYUSER;
+extern cdThreadID_t LASTCALLEDTHREADIDBYUSER;   
 
 
 
@@ -542,23 +560,23 @@ extern cdThreadID_t LASTCALLEDTHREADIDBYUSER;
 /*! \def cdthread_isEngineManagedID(x)
    is a macro that check if cdThreadID 'x' is Engine managed cdthread; return true if is Engine managed
 */
-#define cdthread_isEngineManagedID(x)   ( x > CDTHREADID_ERROR)
+#define cdthread_isEngineManagedID( YxY )   ( YxY > CDTHREADID_ERROR)
 
 /*! \def cdthread_isUserManagedID(x)
    is a macro that check if cdThreadID 'x' is user managed cdthread; return true if is user managed
 */
-#define cdthread_isUserManagedID(x)      ( x < CDTHREADID_ERROR)
+#define cdthread_isUserManagedID( YxY )      ( YxY < CDTHREADID_ERROR)
 
 /*! \def cdthread_isErrorID(x)
    is a macro that check if cdThreadID 'x' is no usable cdThreadID (errorID) ; return true if is unusable 
 */
-#define cdthread_isErrorID(x)      ( x == CDTHREADID_ERROR)
+#define cdthread_isErrorID( YxY )      ( YxY == CDTHREADID_ERROR)
 
 /*! \def cdthread_checkValidID(x)
    checks if cdThredID 'x' is a valid ID, this means that isn't a CDTHREADID_ERROR and is inside from -CDTHREAD_MAX_NUM_THREADS to CDTHREAD_MAX_NUM_THREADS.
    \n return true if is valid otherwis return false
 */
-#define cdthread_checkValidID( YY)   (( YY !=CDTHREADID_ERROR)&&( YY <=CDTHREAD_MAX_NUM_THREADS)&&( YY >=(CDTHREAD_MAX_NUM_THREADS*(-1))))
+#define cdthread_checkValidID( YxY)   (( YxY !=CDTHREADID_ERROR)&&( YxY <=CDTHREAD_MAX_NUM_THREADS)&&( YxY >=(CDTHREAD_MAX_NUM_THREADS*(-1))))
 
 
 
@@ -568,7 +586,7 @@ extern cdThreadID_t LASTCALLEDTHREADIDBYUSER;
    used also as parameter in function like cdthread_new() and cdthread_newUserManaged to pass a CDTHREADFUNCTION_NOFUNCTION address for tread function
 */
 //#define CDTHREADFUNCTION_NOFUNCTION      (cdtreadFunctionType)0x00000000
-int CDTHREADFUNCTION_NOFUNCTION(int a, cdThreadID_t b , int c);
+sint_t CDTHREADFUNCTION_NOFUNCTION(sint_t a, cdThreadID_t b , sint_t c);
 
 
 /*! \def CDTHREADPRIORITY_DISABLED
@@ -600,32 +618,42 @@ int CDTHREADFUNCTION_NOFUNCTION(int a, cdThreadID_t b , int c);
 void cdthread_initAll(void); //!< must be called by initialization main to reset and init system threads array
 
 cdThreadID_t cdthread_getFreeID(void);                           //!< searchs free/available position in system thread array
-cdthreadStruct* cdthread_getPointerToStruct(cdThreadID_t pThId); //!< returns a cdthreadStruct type pointer directly to inndicated element of internal thread struct array; in case of error return a pointer to 0x0000000
+cdThreadStruct_t* cdthread_getPointerToStruct(cdThreadID_t pThId); //!< returns a cdthreadStruct type pointer directly to inndicated element of internal thread struct array; in case of error return a pointer to 0x0000000
 cdThreadID_t cdthread_getArrayIdxFromID(cdThreadID_t pThId);      //!< return the index for cdthreadsSystemArray extracted from indicated cdThreadID (pThId)
 
-int  cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction);    //!< creates a new thread for Thread_Engine; after creation the thread is disabled, doesn't have messages and the firsttime is set to true
-int  cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction); //!<creates a new USER managed thread (not managed by Thread Engine); after creation the thread is disabled, doesn't have messages and the first time is set to true
+//sint_t cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction);    
+sint_t cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, const char * pLogName); //!< creates a new thread for Thread_Engine; after creation the thread is disabled, doesn't have messages and the firsttime is set to true
+sint_t cdthread_newAlways(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, const char * pLogName); //!< creates a new thread for Thread_Engine that run always after every other one; for example: run thread A, followed by always thread, followed by Thread B, followed by thrad Always anbd so on
+//sint_t cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction); 
+sint_t cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, const char * pLogName); //!<creates a new USER managed thread (not managed by Thread Engine); after creation the thread is disabled, doesn't have messages and the first time is set to true
 
-int  cdthread_DestroyThread(cdThreadID_t* pThId);                        //!< destroy the indicated thread (memory are free for another new thread), and every message associated at that thread
-int  cdthread_isDestroyed(cdThreadID_t pThId);         //!<checks if passed id is destroyed (invalid pThId or pThId signed as destroyed) and if it is then return true
+sint_t cdthread_DestroyThread(cdThreadID_t* pThId);                        //!< destroy the indicated thread (memory are free for another new thread), and every message associated at that thread
+sint_t cdthread_isDestroyed(cdThreadID_t pThId);         //!<checks if passed id is destroyed (invalid pThId or pThId signed as destroyed) and if it is then return true
 #define cdthread_Exist( pThId )            (!cdthread_isDestroyed( pThId ))   //!<checks if passed id is valid and indicated thread is not destroyed 
 
-int  cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction); //!< changes only called function by indicated thread without change any other thread fields
-int  cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction);   //!<checks if called function by indicated thread (pThId) is the same passed (ptrFunction)
-int  cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction);    //!<destroys allocated thread and assign a new one
+sint_t cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction); //!< changes only called function by indicated thread without change any other thread fields
+sint_t cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction);   //!<checks if called function by indicated thread (pThId) is the same passed (ptrFunction)
+////DEPRECATED 2019-03-10: sint_t  cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction);    //!<destroys allocated thread and assign a new one
 
-int  cdthread_signAsFirtsTime(cdThreadID_t pThId);       //!<set firsttime flag as true for indicated thread
-int  cdthread_Enable(cdThreadID_t pThId, int pPriority); //!< enable indicated Thread with indicated priority
-int  cdthread_Disable(cdThreadID_t pThId);                 //!< disable indicated Thread and stop to wait a message for wakeup
-int  cdthread_WaitMessage(cdThreadID_t pThId);   //!<disable indicated Thread and set to wait a message; the thread will be called when a message arrive (wakeup one time) to manage the message, but not enabled
+sint_t cdthread_signAsFirtsTime(cdThreadID_t pThId);       //!<set firsttime flag as true for indicated thread
 
-int  cdthread_isEnabled(cdThreadID_t pThId);          //!< checks if indicated Thread is enabled (priority over 0) and return true if enabled
-int  cdthread_getPriority(cdThreadID_t pThId);          //!< return the actual pripority of thread (0=disable), or -1 for error
-int  cdthread_getPrevExitStatus(cdThreadID_t pThId);  //!< return the last exit state; if hasn't a previous exit state (first time executed) return 0. if an error happen return -1
+sint_t cdthread_Enable(cdThreadID_t pThId); //!< enable indicated Thread with base/standard priority 
+sint_t cdthread_Enable_with_priority(cdThreadID_t pThId, sint_t pPriority); //!< enable indicated Thread with indicated priority 
+sint_t cdthread_ISR_FAST_enable(cdThreadID_t pThId);    //!< used only in managed thread and inside ISR to enable a thread without checks and test but quickly
+    
+sint_t cdthread_Disable(cdThreadID_t pThId);                 //!< disable indicated Thread and stop to wait a message for wakeup
+sint_t cdthread_WaitMessage(cdThreadID_t pThId);   //!<disable indicated Thread and set to wait a message; the thread will be called when a message arrive (wakeup one time) to manage the message, but not enabled
 
-int  cdthread_isThrereMessages(cdThreadID_t pThId);   //!< check if indicated thread has almost a message on the thread message queue
-cdMessageID_t cdthread_getMessage(cdThreadID_t pThId); //!<return the first message (ID) on msg queue of indicated thread (and sign it as readed); if there isn't or an error occours then return CDMESSAGEID_ERROR
-int cdthread_removeMessage(cdThreadID_t pThId);      //!<remove first message from thread msg queue and return true if action has success, otherwise return false
+sint_t cdthread_isEnabled(cdThreadID_t pThId);          //!< checks if indicated Thread is enabled (priority over 0) and return true if enabled 
+sint_t cdthread_isWaitingMessage(cdThreadID_t pThId);   //!< checks if indicated Thread is disabled but waiting a message to wakeup
+
+sint_t cdthread_getPriority(cdThreadID_t pThId);          //!< return the actual pripority of thread (0=disable), or -1 for error
+sint_t cdthread_getPrevExitStatus(cdThreadID_t pThId);  //!< return the last exit state; if hasn't a previous exit state (first time executed) return 0. if an error happen return -1
+
+sint_t cdthread_isThrereMessages(cdThreadID_t pThId);   //!< check if indicated thread has almost a message on the thread message queue
+//cdMessageID_t cdthread_getMessage(cdThreadID_t pThId); //!<return the first message (ID) on msg queue for indicated thread (and ); if there isn't or an error occours then return CDMESSAGEID_ERROR
+cdmessageData_t cdthread_getMessage(cdThreadID_t pThId); //!<return the first message (ID) on msg queue for indicated thread (and ); if there isn't or an error occours then return CDMESSAGEID_ERROR
+//sint_t cdthread_removeMessage(cdThreadID_t pThId);      //!<remove first message from thread msg queue and return true if action has success, otherwise return false
 
 
 //******************************************************************************************************
@@ -634,7 +662,84 @@ sint_t cdthread_Engine(void);   //!< is the engine for thread and must be called
 
 //cdThreadID_t cdthread_ThreadToRun(cdThreadID_t LastRunnedThread);   //!< is called by cdthread_Engine() to determine which is next thread to run
 
-sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, int* exitCode); //!< call thread_function, if thread is enabled and id is good (no errors); return true if called, otherwise false
+sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, sint_t* exitCode); //!< call thread_function, if thread is enabled and id is good (no errors); return true if called, otherwise false
+
+
+//******************************************************************************************************
+
+//following define used inside a thread to manage functionality
+#define NEW_CDTHFUNCTION( XyX ) 	sint_t XyX (sint_t firstTime, cdThreadID_t ThisThread, sint_t prevExitCode)
+
+//used to split code for a long NEW_CDTHFUNCTION( XXX ), so that inside NEW_CDTHFUNCTION( XXX ) is possible to call a NEW_CDTHSUBFUNCTION( XXX ) by CALL_CDTHSUBFUNCTION( ... )
+#define NEW_CDTHSUBFUNCTION( XyX ) 	sint_t XyX (sint_t firstTime, cdThreadID_t ThisThread, sint_t prevExitCode, void* callerDataPtr)
+#define CALL_CDTHSUBFUNCTION( XyX , XXPtrToDataXX ) 	prevExitCode = XyX (firstTime, ThisThread, prevExitCode, (void*) XXPtrToDataXX  )
+
+//for example NEW_CDTHFUNCTION( BuzzerCDThFunction ) creates:
+//sint_t BuzzerCDThFunction(sint_t firstTime, cdThdID_t ThisThread, sint_t prevExitState)
+
+#define cdTHISth_getThreadID() 			ThisThread
+#define cdTHISth_getPrevExitStatus()    prevExitCode
+#define cdTHISth_getActualStatus()      prevExitCode
+#define cdTHISth_setActualStatus( XyX ) prevExitCode = XyX
+#define cdTHISth_IsFirstTimeThatRun() 	(firstTime == TRUE )
+#define cdTHISth_Destroy() 			    cdthread_DestroyThread( ThisThread )
+#define cdTHISth_signAsFirtsTime() 		cdthread_signAsFirtsTime( ThisThread )
+//not implemented #define cdTHISth_waitUpTo( TTT ) 		cdthread_waitUpTo( ThisThread , TTT )
+#define cdTHISth_Enable() 			    cdthread_Enable( ThisThread , CDTHREADPRIORITY_ENABLED )
+#define cdTHISth_Disable() 			    cdthread_Disable( ThisThread )
+#define cdTHISth_isThrereMessages() 	cdthread_isThrereMessages( ThisThread )
+#define cdTHISth_getMessage() 			cdthread_getMessage( ThisThread )
+#define cdTHISth_removeMessage() 		cdthread_removeMessage( ThisThread )
+#define cdTHISth_waitMessage()          cdthread_WaitMessage( ThisThread )
+
+#define cdTHISth_NewMsgNoData( XXXThreadDest , XXXInfoVal )                          cdmessage_new( XXXThreadDest , XXXInfoVal , CDMESSAGEDATA_NODATA , ThisThread )
+#define cdTHISth_NewMsgWithData( XXXThreadDest , XXXInfoVal , XXXData )              cdmessage_new( XXXThreadDest , XXXInfoVal , XXXData , ThisThread )
+//remenber: data pointed by XXXPtrData must be static or global otherwise the reader will read wrong and unpredictable data
+#define cdTHISth_NewMsgWithPtrToData( XXXThreadDest , XXXInfoVal , XXXPtrData )      cdmessage_new( XXXThreadDest , XXXInfoVal , (cdMsgData_t)((void *)XXXPtrData) , ThisThread )
+
+#define Anonymous_NewMsgNoData( XXXThreadDest , XXXInfoVal )                          cdmessage_new( XXXThreadDest , XXXInfoVal , CDMESSAGEDATA_NODATA , CDTHREADID_NOTHREAD )
+#define Anonymous_NewMsgWithData( XXXThreadDest , XXXInfoVal , XXXData )              cdmessage_new( XXXThreadDest , XXXInfoVal , XXXData , CDTHREADID_NOTHREAD )
+//remenber: data pointed by XXXPtrData must be static or global otherwise the reader will read wrong and unpredictable data
+#define Anonymous_NewMsgWithPtrToData( XXXThreadDest , XXXInfoVal , XXXPtrData )      cdmessage_new( XXXThreadDest , XXXInfoVal , (cdMsgData_t)((void *)XXXPtrData) , CDTHREADID_NOTHREAD )
+
+
+//remenber: data pointed by XXXPtrData must be static or global otherwise the reader will read wrong and unpredictable data
+#define cdTHISth_MsgAnswerToSender( XXXInfoVal )                                     cdmessage_new( msgD.msgSender , XXXInfoVal , CDMESSAGEDATA_NODATA , ThisThread )
+#define cdTHISth_MsgAnswerToSenderWithData( XXXInfoVal , XXXData )                   cdmessage_new( msgD.msgSender , XXXInfoVal , XXXData , ThisThread )
+//remenber: data pointed by XXXPtrData must be static or global otherwise the reader will read wrong and unpredictable data
+#define cdTHISth_MsgAnswerToSenderWithPtrData( XXXInfoVal , XXXPtrData )             cdmessage_new( msgD.msgSender , XXXInfoVal , XXXPtrData , ThisThread )
+
+
+//remember to place ALLOCATE_CDMESSAGE_STD_VARIABLES	to allocate the variables cdMsgID_t actMsg ; sint_t msgInfo ; cdThdID_t msgSender ;  void* msgDataPtr
+//this define simply call and assign value for the cdthread_getMessage and cdmessage_getInfo
+//#define ALLOCATE_ACTMSG_MSGINFO_VARIABLES		cdMessageID_t actMsg ; sint_t msgInfo 
+//#define ALLOCATE_MSG_SENDER_VARIABLE            static cdThreadID_t msgSender = CDTHREADID_NOTHREAD 
+//#define ALLOCATE_MSG_SENDER_DATAPTR_VARIABLES	static cdThreadID_t msgSender = CDTHREADID_NOTHREAD ;  cdMsgData_t msgData
+//#define ALLOCATE_MSG_ALL_VARIABLES              cdMessageID_t actMsg ; sint_t msgInfo ; static cdThreadID_t msgSender = CDTHREADID_NOTHREAD ;  cdMsgData_t msgData 
+#define ALLOCATE_MSG_ALL_VARIABLES                static cdmessageData_t msgD;
+
+//following define used inside a thread to manage messages
+//#define cdTHISth_getActMsgAndMsgInfo()      actMsg = cdthread_getMessage( ThisThread ) ; msgInfo = cdmessage_getInfo( actMsg )
+//#define cdTHISth_getMsgSender()             msgSender = cdmessage_getSenderThread( actMsg )
+//#define cdTHISth_getMsgData()               msgData = cdmessage_getData( actMsg )
+//#define cdTHISth_getMsgDataPointer()		msgData = (cdMsgData_t)cdmessage_getDataPointer( actMsg )
+#define cdTHISth_getActMsgParameters()               msgD = cdthread_getMessage( ThisThread )
+
+
+//#define cdTHISth_useActMsg()                actMsg
+//#define cdTHISth_useMsgInfo()               msgInfo
+//#define cdTHISth_useMsgSender()             msgSender
+//#define cdTHISth_useMsgDataPtr()            (void *)msgData
+//#define cdTHISth_useMsgData()               msgData
+#define cdTHISth_useMsgDstruct()            msgD
+#define cdTHISth_useActMsg()                msgD.actMsg
+#define cdTHISth_useMsgInfo()               msgD.msgInfo
+#define cdTHISth_useMsgSender()             msgD.msgSender
+#define cdTHISth_useMsgDataPtr()            (void *)(msgD.msgData)
+#define cdTHISth_useMsgData()               msgD.msgData
+
+
+//******************************************************************************************************
 
 
 
@@ -646,41 +751,71 @@ sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, int* exitCode); //!< 
 //use a 64bit means that if ticks is 1us we have 580000 years before it has a round 
 
 //indicates that 1ms is equal to 100 ticks of Absolute_timer
-#define CDTIMER_us_FOR_TICK   8
-#ifndef CDTIMER_us_FOR_TICK
-    #ERROR CDTIMER_us_FOR_TICK not defined, see CDThread.h
-#endif
+//#define CDTIMER_us_FOR_TICK   8
+//#ifndef CDTIMER_us_FOR_TICK
+//    #error CDTIMER_us_FOR_TICK not defined, see CDThread.h
+//#endif
 
 
 //indicates that 1ms is equal to 100 ticks of Absolute_timer
-//#define CDTIMER_1ms_TICKS   ( 1000 / CDTIMER_us_FOR_TICK )
-#define CDTIMER_1ms_TICKS   125
+////#define CDTIMER_1ms_TICKS   ( 1000 / CDTIMER_us_FOR_TICK )
+//#define CDTIMER_1ms_TICKS   125
 
 //#define CDTIMER_1s_TICKS   ( 1000000 / CDTIMER_us_FOR_TICK )
-#define CDTIMER_1s_TICKS    125000
+//because timer1 use a 32768Hz external crystal, the results is that
+#define CDTIMER_1s_TICKS    32768
 
 //the cdTimerID is not a simple ID but contains the value when timer expires (expeted absolute timer value)
 //with CDTIMER_us_FOR_TICK = 8 the maximun storable time is 34359,7384 seconds that is a little more than 9,5 hours
-typedef uint32_t cdTimerID;
-
+#ifdef PLATFORM_BLACKFIN
+   typedef uint64_t cdTimerID;
+#else
+   typedef uint32_t cdTimerID;
+#endif
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 //GLOBAL VARIABLE FOR TIME, see CDTIMER_us_FOR_TICK to know how many us for ticks
 extern  cdTimerID   Absolute_timer;
+extern void Update_Absolute_Timer();   //!< the function used to update Absolute Timer value
+extern void ISR_TIM1_Update_Absolute_Timer() ; //!<special version of update_absolute_timer for ISR of timer1
+//extern  void ForceTim0Value( uint16_t tvalue ); //!< the function used to update timer0 value without tick error in Update_Absolute_Timer
+extern  void Set_Absolute_Timer( cdTimerID pval ); //!< set the value counting of absolute timer avoid errors when is called Update_Absolute_Timer
+#define Get_Absolute_Timer()    (Absolute_timer)
+
+//#define Absolute_Timer_Ticks_to_Seconds( tickXYX )    (tickXYX /  CDTIMER_1s_TICKS)
+#define Absolute_Timer_Ticks_get_Seconds( tickXYX )    (tickXYX >> 15)
+
+//#define Absolute_Timer_Ticks_get_Remainder( tickXYX )    (tickXYX - (((uint32_t)(tickXYX / CDTIMER_1s_TICKS)) * CDTIMER_1s_TICKS))
+#define Absolute_Timer_Ticks_get_Remainder( tickXYX )    (tickXYX & 0x7FFF)
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 
-   
-#define cdtimer_setupTicks(ticksVal)    (Absolute_timer + ticksVal)
-#define cdtimer_setup_s(msVal)          (Absolute_timer + (msVal * CDTIMER_1s_TICKS))
-#define cdtimer_setupms(msVal)          (Absolute_timer + (msVal * CDTIMER_1ms_TICKS))
-#define cdtimer_setupus(usVal)          (Absolute_timer + (usVal / CDTIMER_us_FOR_TICK))
-#define cdtimer_isExpired(cdTID)      (cdTID <= Absolute_timer)
-#define cdtimer_isNotExpired(cdTID)      (cdTID > Absolute_timer)
+//returns number of tick necessary for ValXZYX seconds; ValXZYX must be an integer value
+#define cdtimer_TicksForSeconds( ValXZYX )   (( (cdTimerID)ValXZYX * CDTIMER_1s_TICKS ) + ( ValXZYX >>1 ))
+//used to set a elapsed value for a CDTIMER; returns value of ticks for ticksValXZX added to actual value of absolute tiemr
+//Is a good practice call cdtimer_UpdateTicks() function before use this macro
+#define cdtimer_setupTicks( ticksValXZX )    ( Absolute_timer + ticksValXZX )
+//as cdtimer_setupTicks but desired elapsed time value is expressed in seconds and not in ticks
+#define cdtimer_setup_s( msValXZX )          ( Absolute_timer + cdtimer_TicksForSeconds( msValXZX ) )
+//#define cdtimer_setup_ms( msValXZX )          (Absolute_timer + ( msValXZX * CDTIMER_1ms_TICKS))
+//#define cdtimer_setup2_064ms( msValXZX )     ( Absolute_timer + msValXZX )
+//to fastly divide for 2.064 is possible to moltiply for 0,484496 that
+// is possible to aproximate to X * ((1 - 0,03125) /2)= 0.484375 with Err= -0,025%
+// that is (X - (X>>5))>>1
+//as erroe is 1ms minus on 4s; i think that is aceptable, otherwise
+// a more precise calc is (X - (X>>5) + (X>>12)) /2
+//#define cdtimer_setup_ms( msValXZX )     ( Absolute_timer + ((msValXZX - (msValXZX>>5))>>1) )
+#define cdtimer_setup_ms( msValXZX )          (Absolute_timer + ( msValXZX * CDTIMER_1s_TICKS / 1000))
+
+//#define cdtimer_setupus( usValXZX )          (Absolute_timer + (usValXZX / CDTIMER_us_FOR_TICK))
+#define cdtimer_isExpired( cdTIDxzx )        ( (cdTimerID)cdTIDxzx <= (cdTimerID)Absolute_timer )
+#define cdtimer_isNotExpired( cdTIDxzx )     ( (cdTimerID)cdTIDxzx > (cdTimerID)Absolute_timer )
+
+void cdTimer_INIT();
 
 //use example:
 //cdTimerID myTimer1, myTimer2;
-//myTimer1 = cdtimers_setupTicks(20);  //assign the timer value for 200us
+//myTimer1 = cdtimers_setupTicks(20);   //assign the timer value for 200us
 //myTimer2 = cdtimers_setupms(1);      //assign the timer value for 1ms
 
 //while( cdtimer_isNotExpired(myTimer1) ){
@@ -695,29 +830,29 @@ extern  cdTimerID   Absolute_timer;
 //*********************************************************************
 //*************jump table inside cdth_functions************************
 //*********************************************************************
-
-
 //if varaible equl to n then jump to CDTH_EXITandRETURN with same n value
-#define CDTH_JUMPTABLE( variable , n )   if( variable == n ) goto LABEL_JUMP_WAIT##n  
+//#define CDTH_JUMPTABLE( variable , XZX )   if( variable == XZX ) goto LABEL_JUMP_WAIT##XZX  
+#define CDTH_JUMPTO( XZX )   if( prevExitCode == XZX ) goto LABEL_JUMP_WAIT##XZX  
+//deprecated: #define CDTH_FORCESTATE( XZX )   prevExitCode = XZX  //please use instead cdTHISth_setActualStatus()
 
+//exit with n value if condition is true, also return here from a CDTH_JUMPTABLE with same n value; return and test condition
+#define CDTH_COMEHERE_FOR(  n  )   LABEL_JUMP_WAIT##n: 
+//exit with n value if condition is true, also return here from a CDTH_JUMPTABLE with same n value; return and test condition
+#define CDTH_COMEHERE_butEXITif(  n , conditionXZX )   LABEL_JUMP_WAIT##n:  if( conditionXZX ) return n
+//exit with n value if condition is true, also return here from a CDTH_JUMPTABLE with same n value; return and test condition
+#define CDTH_COMEHERE_butCONTINUEif(  n , conditionXZX )   LABEL_JUMP_WAIT##n:  if( ! ( conditionXZX ) ) return n
 
 //exit with XZX value
 #define CDTH_EXITwithCODE(  XZX  )   return XZX
-
-
-//exit with n value if condition is true, also return here from a CDTH_JUMPTABLE with same n value; return and test condition
-#define CDTH_RETURN_HERE(  n  )   LABEL_JUMP_WAIT##n: 
-
-//exit with n value if condition is true, also return here from a CDTH_JUMPTABLE with same n value; return and test condition
-#define CDTH_RETURNbutEXITif(  n , condition )   LABEL_JUMP_WAIT##n:  if( condition ) return n
-
 //exit with actual state of internal ThisThread variable
 #define CDTH_EXIT      return prevExitCode
+//exit with actual state of internal ThisThread variable
+#define CDTH_EXIT_NEXT_CODE     return ( prevExitCode + 1)
 
-//set EXIT CODE code of function bu NOT EXIT NOW
-#define CDTH_SET_EXIT_CODE(  XZX  )   prevExitCode = XZX
+//deprecated CDTH_SET_EXIT_CODE, see cdTHISth_setActualStatus.
+//set EXIT CODE code of function but NOT EXIT NOW
+//#define CDTH_SET_EXIT_CODE(  XZX  )   prevExitCode = XZX
 
 
-
-#endif  //_CDTHREAD_H_
+#endif  //__CDTHREAD_H__
 
