@@ -6,9 +6,10 @@
 //// without written permission.                                        ////
 ////                                                                    ////
 //// Author: Dario Cortese                                              ////
-//// Client: myself                                                     ////
+//// Client: Mongoose srl (Mariano Cerbone)                             ////
 //// User: Dario Cortese                                                ////
 //// Created on 08/05/2013 modified 04-11-2015                          ////
+//// Modify on 19/05/2018 to be adapted at CCS compiler                 ////
 //// File: cdRoundstream.c                                              ////
 //// Description:                                                       ////
 ////    This file has the functions to manage a generic byte stream.    ////
@@ -69,7 +70,7 @@
 #ifndef _CDROUNDINGSTREAM_C_
 #define _CDROUNDINGSTREAM_C_
 
-#include "cdRoundstream.h"
+#include "CDRoundstream.h"
 
 #ifdef DOXYGEN
     #define section(YY)
@@ -88,14 +89,22 @@
 	\todo nothing
 */
 sint_t cdRStreamInit(CDRStream_t* pStream, CDRStream_data_t* pPtrBuff, CDRStream_counters_t pBuffSize){
-	if( pStream== NULL ) return -1;
-	if( pBuffSize==0 ) return -2;
-	if( pPtrBuff== NULL ) return -3;
-	if( pBuffSize > CDRSTREAMER_MAX_BUFFER_SIZE ) return -4;
-
+	if( pStream == NULL ) return -1;
+	pStream->errors = CDRSTREAMERR_UNITIALIZED;
+	if( pBuffSize == 0 ){
+        pStream->errors = CDRSTREAMERR_BADBUFFSIZE;
+        return -2;
+    }
+	if( pPtrBuff == NULL ){
+        pStream->errors = CDRSTREAMERR_BADPTRBUFF;
+        return -3;
+    }
+	if( pBuffSize > CDRSTREAMER_MAX_BUFFER_SIZE ){
+        pStream->errors = CDRSTREAMERR_BADBUFFSIZE;
+        return -4;
+    }
     pStream->Writings =0;
 	pStream->Readings =0;
-	pStream->errors= CDRSTREAMERR_UNITIALIZED;
 	pStream->buffPtr = pPtrBuff;
 	pStream->buffEndPtr = pPtrBuff + (pBuffSize -1);  
 	pStream->buffWRptr = pPtrBuff;
@@ -127,7 +136,7 @@ sint_t cdRStreamReset(CDRStream_t* pStream){
 	pStream->buffWRptr = pStream->buffPtr;
 	pStream->buffRDptr = pStream->buffPtr;
 	//pStream->buffSize = pBuffSize;	
-	pStream->errors= CDRSTREAMERR_NO_ERROR;
+	pStream->errors = CDRSTREAMERR_NO_ERROR;
 	//pStream->autoFlush=true;
 	pStream->blockRead=FALSE;
 	return 0;
@@ -154,9 +163,9 @@ CDRStream_counters_t cdRStream_CalcAvailableWritings(CDRStream_t* pStream)
 	CDRStream_counters_t a;
 	CDRStream_counters_t b;
 	b= pStream->buffSize;
-	a= pStream->Writings - pStream->Readings;
+	a= (CDRStream_counters_t) (pStream->Writings - pStream->Readings);
 	if (a >= b) return 0;   
-	return (b - a); 
+	return (CDRStream_counters_t)(b - a); 
 }
 
 //private/internal function
@@ -165,7 +174,7 @@ CDRStream_counters_t cdRStream_CalcAvailableReadings(CDRStream_t* pStream)
 	CDRStream_counters_t a;
 	CDRStream_counters_t b;
 	b= pStream->buffSize;
-	a= pStream->Writings - pStream->Readings;
+	a= (CDRStream_counters_t)(pStream->Writings - pStream->Readings);
 	if (a >= b) return b;   
 	return a; 
 }
@@ -185,8 +194,11 @@ CDRStream_counters_t cdRStream_CalcAvailableReadings(CDRStream_t* pStream)
 	\todo test it
 */
 sint_t cdRStreamPutVal(CDRStream_t* pStream, CDRStream_data_t pData){
-	if( pStream== NULL ) return -1;
-	if(( pStream->errors & CDRSTREAMERR_UNITIALIZED )!=0) return -2;
+	if( pStream == NULL )
+        return -1;
+    
+	if( (pStream->errors & CDRSTREAMERR_ERRMASKWRITE )!= CDRSTREAMERR_NO_ERROR)
+        return -2;
 	
 	if(	cdRStream_CalcAvailableWritings(pStream) == 0){
 		//error, write will be over the readable value
@@ -194,21 +206,16 @@ sint_t cdRStreamPutVal(CDRStream_t* pStream, CDRStream_data_t pData){
 		//return -3;
 		//move read pointer to next elements
 		pStream->buffRDptr++;
-		if(pStream->buffRDptr == pStream->buffEndPtr)
-		{
+    	if(pStream->buffRDptr == pStream->buffEndPtr) {
 			pStream->buffRDptr = pStream->buffPtr;
 		}
-
 	}
 	*(pStream->buffWRptr) = pData;
 	pStream->Writings++;
 	//rounding
-	if(pStream->buffWRptr == pStream->buffEndPtr)
-	{
+	if(pStream->buffWRptr == pStream->buffEndPtr)	{
 		pStream->buffWRptr = pStream->buffPtr;
-	}
-	else
-	{
+	}else{
 		pStream->buffWRptr ++;
 	}
 	return 0;
@@ -232,7 +239,8 @@ sint_t cdRStreamPutArrayVal(CDRStream_t* pStream, CDRStream_data_t *pData, CDRSt
 	sint_t rval;
 	for(;iNumData>0;iNumData--){
 		rval = cdRStreamPutVal(pStream, *pData);
-		if(rval < 0) return rval;
+		if(rval < 0)
+            return rval;
 		
 		pData++;
 	}	
@@ -256,12 +264,15 @@ sint_t cdRStreamPutArrayVal(CDRStream_t* pStream, CDRStream_data_t *pData, CDRSt
 	\todo nothing
 */
 CDRStream_counters_t cdRStreamGetNumVals(CDRStream_t* pStream){
-	if( pStream== NULL ) return -1;
-	if(( pStream->errors & CDRSTREAMERR_UNITIALIZED )!=0) return -2;
+	if( pStream== NULL )
+        return -1;
+	if(( pStream->errors & CDRSTREAMERR_ERRMASKREAD ) != CDRSTREAMERR_NO_ERROR)
+        return -2;
 	//if stream read is blocked then return always zero byte readable
-	if( pStream->blockRead) return 0;	//read blocked so always indicates 0 available val to be read
+	if( pStream->blockRead)
+        return 0;	//read blocked so always indicates 0 available val to be read
 	
-	return (sint32_t) cdRStream_CalcAvailableReadings(pStream);
+	return cdRStream_CalcAvailableReadings(pStream);
 }
 
 
@@ -287,6 +298,8 @@ sint_t cdRStreamPregetVal(CDRStream_t* pStream, CDRStream_data_t* ptrVal ){
 		pStream->errors |= CDRSTREAMERR_READ_EMPTY;
 		return -4; //error for empty stream
 	}
+    //reset possble error
+    pStream->errors &= (~CDRSTREAMERR_READ_EMPTY);
 	//else return stored value
 	*ptrVal = *(pStream->buffRDptr);
 	return 0; 	
@@ -310,17 +323,14 @@ sint_t cdRStreamPregetVal(CDRStream_t* pStream, CDRStream_data_t* ptrVal ){
 sint_t  cdRStreamGetVal(CDRStream_t* pStream, CDRStream_data_t* ptrVal){
 	sint_t val;
 	val = cdRStreamPregetVal(pStream, ptrVal);
-	if (val < 0) return val;
+	if (val < 0)
+        return val;
 	//if no error happen then increment read logical pointer for the stream
 	pStream->Readings++;
-	
 	//if there is a rounding then return at the start of buffer
-	if(pStream->buffRDptr == pStream->buffEndPtr)
-	{
+	if(pStream->buffRDptr == pStream->buffEndPtr) {
 		pStream->buffRDptr = pStream->buffPtr;
-	}
-	else
-	{
+	}else{
 		pStream->buffRDptr +=1;
 	}
 	return 0;
@@ -341,18 +351,18 @@ sint_t  cdRStreamGetVal(CDRStream_t* pStream, CDRStream_data_t* ptrVal){
 */
 sint_t cdRStreamDiscardVal(CDRStream_t* pStream){
 	if( pStream== NULL ) return -1;
-	if(( pStream->errors & CDRSTREAMERR_UNITIALIZED )!=0) return -2;
+  	if(( pStream->errors & CDRSTREAMERR_ERRMASKREAD ) != CDRSTREAMERR_NO_ERROR)
+        return -2;
 	//if stream read is blocked then return always zero byte readable
-	if( pStream->blockRead) return 0;	//read blocked so always indicates 0 available val to be read
-	if(pStream->Readings >= pStream->Writings) return 0;	//if nothing to read there isn't nothing to discard
+	if( pStream->blockRead)
+        return 0;	//read blocked so always indicates 0 available val to be read
+	if(pStream->Readings >= pStream->Writings)
+        return 0;	//if nothing to read there isn't nothing to discard
 	pStream->Readings++;
 	//if there is a rounding then return at the start of buffer
-	if(pStream->buffRDptr == pStream->buffEndPtr)
-	{
+	if(pStream->buffRDptr == pStream->buffEndPtr) {
 		pStream->buffRDptr = pStream->buffPtr;
-	}
-	else
-	{
+	}else{
 		pStream->buffRDptr +=1;
 	}
 	return 0;
@@ -372,13 +382,15 @@ sint_t cdRStreamDiscardVal(CDRStream_t* pStream){
 int cdRStreamGetError(CDRStream_t* pStream){
 	int errval;
 	//if the pointer is null then return error for uninitialized stream
-	if( pStream== NULL ) return CDRSTREAMERR_UNITIALIZED;
+	if( pStream== NULL ) 
+        return CDRSTREAMERR_UNITIALIZED;
 	
 	errval= pStream->errors; 
 	//never must be reset the unitialized stream signaling/error
-	if((errval & CDRSTREAMERR_UNITIALIZED) !=0){
-		pStream->errors= CDRSTREAMERR_UNITIALIZED;
+	if(errval == CDRSTREAMERR_UNITIALIZED){
+		pStream->errors = CDRSTREAMERR_UNITIALIZED;
 	}else{
+        //rest the errors after read
 		pStream->errors= CDRSTREAMERR_NO_ERROR;
 	}
 	return errval;
@@ -392,21 +404,21 @@ int cdRStreamGetError(CDRStream_t* pStream){
 	\version 1.0
 	\brief trash unread value int the stream and reset errors
 	\param pStream is the pointer to cdRStream (data structure)
-	\return 0 if nothing to flush, 1 to indicates one or more data flushed, otherwise return -1 or negative numbers to indicates errors
+	\return 0 if all ok, otherwise return -1 or other negative numbers to indicate errors
 	\note for error code see STREAMERR_UNITIALIZED
 	\see cdRStreamGetError  
 	\todo test it
 */
 sint_t cdRStreamFlush(CDRStream_t* pStream){
-	CDRStream_counters_t numB;
-	
-	if( pStream== NULL ) return -1;
-	numB = cdRStreamGetNumVals(pStream);
+	if( pStream == NULL )
+        return -1;
+  	if( pStream->errors == CDRSTREAMERR_UNITIALIZED)
+        return -2;
+
 	//else numB if 0 or more then mean that pStream is initializated and not null 
 	pStream->buffRDptr = pStream->buffWRptr;
 	pStream->Readings = pStream->Writings;	
-	pStream->errors= CDRSTREAMERR_NO_ERROR;	//reset errors
-	if( numB > 0) return 1;
+	pStream->errors = CDRSTREAMERR_NO_ERROR;	//reset errors
 	return 0;
 }
 
@@ -426,9 +438,11 @@ sint_t cdRStreamFlush(CDRStream_t* pStream){
 CDRStream_counters_t cdRStreamPutAvilableVals(CDRStream_t* pStream){
 	//sint32_t numB;
 	//if( pStream== NULL ) return -1;
-	if( pStream== NULL ) return 0;
+	if( pStream== NULL )
+        return 0;
 	//if(( pStream->errors & CDRSTREAMERR_UNITIALIZED )!=0) return -2;
-	if(( pStream->errors & CDRSTREAMERR_UNITIALIZED )!=0) return 0;
+	if( pStream->errors == CDRSTREAMERR_UNITIALIZED ) 
+        return 0;
 	return cdRStream_CalcAvailableWritings(pStream);
 }
 
@@ -464,33 +478,40 @@ sint_t cdRStreamTocdRStream(CDRStream_t* org, CDRStream_t* dest, CDRStream_count
 	sint_t si;
 	CDRStream_data_t val;
 
-	if( numOfVals==0) return 0;	//nothing to do
+	if( numOfVals==0)
+        return 0;	//nothing to do
 	//checks if the two streamer have space to move numOfVals vals
 	//sAppo = cdRStreamGetNumVals(org);
 	Appo = cdRStreamGetNumVals(org); //return only positive values
 	//check errors
 	//if(sAppo<0) return -1; //an error when attempt to access at org stream
-	if(Appo==0) return -1; //an error because 0 data to transfer
+	if(Appo==0)
+        return -1; //an error because 0 data to transfer
 	//if(sAppo < numOfVals) return -2; //few vals in org stream;
-	if(Appo < numOfVals) return -2; //few vals in org stream;
+	if(Appo < numOfVals)
+        return -2; //few vals in org stream;
 	
 	//sAppo = cdRStreamPutAvilableVals(dest);
 	Appo = cdRStreamPutAvilableVals(dest);
 	//check errors
 	//if(sAppo<0) return -3; //an error when attempt to access at dest stream
-	if(Appo==0) return -3; //an error because 0 data to copy
+	if(Appo==0)
+        return -3; //an error because 0 data to copy
 	//if(sAppo < numOfVals) return -4; //few vals in dest stream;
-	if(Appo < numOfVals) return -4; //few vals in dest stream;
+	if(Appo < numOfVals)
+        return -4; //few vals in dest stream;
 
 	//copy cycle
 	for( ; numOfVals != 0; numOfVals--){
 		si = cdRStreamGetVal(org, &val);
 		//check error in read
-		if(si < 0) return -5;
+		if(si < 0)
+            return -5;
 	
 		si = cdRStreamPutVal(dest, val);
 		//check error in write
-		if(si < 0) return -6;
+		if(si < 0)
+            return -6;
 	}//end for( ; numOfVals != 0; numOfVals--)
 	return 0;	//all ok
 }

@@ -6,9 +6,9 @@
 //// without written permission.                                        ////
 ////                                                                    ////
 //// Author: Dario Cortese                                              ////
-//// Client: myself                                                     ////
+//// Client: Mongoose srl (Mariano Cerbone)                             ////
 //// Created on 26/07/2012                                              ////
-//// Modify on 18/04/2013 to adapt at CCS compiler                      ////
+//// Modify on 12/05/2018 to be adapted at CCS compiler                 ////
 //// File: cdstream.c                                                   ////
 //// Description:                                                       ////
 ////    This file has the functions to manage a generic byte stream.    ////
@@ -72,7 +72,7 @@
 #define _CDSTREAM_C_
 
 //#include <stdlib.h>
-#include "cdstream.h"
+#include "CDStream.h"
 
 #ifdef DOXYGEN
     #define section( YY )
@@ -80,7 +80,7 @@
 
 sint_t CDstreamFunctLastERROR; //!< every function that can't return a value to advice for an error, uses this global variable to advise for a error that cause a un unaxpected exit
 
-/*! \fn sint_t cdstreamInit(CDStream_struct* pStream, CDBuffDataType *pPtrBuff,CDBuffWidthType pBuffSize)
+/*! \fn sint_t cdstreamInit(CDStream_t* pStream, CDBuffDataType_t *pPtrBuff,CDBuffWidthType_t pBuffSize)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013 
    \version 1.1
@@ -92,30 +92,28 @@ sint_t CDstreamFunctLastERROR; //!< every function that can't return a value to 
    \note for errors the same returned value is also copied in CDstreamFunctLastERROR
    \todo re-test it
 */
-sint_t cdstreamInit(CDStream_struct* pStream, CDBuffDataType *pPtrBuff, CDBuffWidthType pBuffSize){
+sint8_t cdstreamInit(CDStream_t* pStream, CDBuffDataType_t *pPtrBuff, CDBuffWidthType_t pBuffSize){
    CDstreamFunctLastERROR=0;   
-
-   if( pStream== NULL ){ CDstreamFunctLastERROR=-1; return -1; }
-   pStream->posWrite =0;
-   pStream->posRead =0;
-   pStream->errors= CDSTREAMERR_UNITIALIZED;
+   if( pStream == NULL ){ CDstreamFunctLastERROR=-1; return -1; }
    
-   if( pPtrBuff== NULL ){ CDstreamFunctLastERROR=-2;return -2; }
+   pStream->posWrite = 0;
+   pStream->posRead = 0;
+   pStream->errors = CDSTREAMERR_UNITIALIZED;
+   if( pPtrBuff == NULL ){ CDstreamFunctLastERROR = -2; return -2; }
+   
    pStream->buffPtr = pPtrBuff;
-   
    if( pBuffSize==0 ){ CDstreamFunctLastERROR=-3; return -3;}
    if( pBuffSize > CDSTREAMER_MAX_BUFFER_SIZE ) {CDstreamFunctLastERROR=-4; return -4;}
+   
    pStream->buffSize = pBuffSize;   
-   
    pStream->errors= CDSTREAMERR_NO_ERROR;
-   
-   pStream->autoFlush=TRUE;
-   pStream->blockRead=FALSE;
+   pStream->autoFlush = TRUE;
+   pStream->blockRead = FALSE;
    return 0;
 } 
 
 
-/*! \fn sint_t cdstreamPutVal(CDStream_struct* pStream, CDBuffDataType pData)
+/*! \fn sint_t cdstreamPutVal(CDStream_t* pStream, CDBuffDataType_t pData)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013 
    \version 1.1
@@ -131,24 +129,24 @@ sint_t cdstreamInit(CDStream_struct* pStream, CDBuffDataType *pPtrBuff, CDBuffWi
 #ifdef PLATFORM_BLACKFIN
 section ("L1_code")
 #endif
-sint_t cdstreamPutVal(CDStream_struct* pStream, CDBuffDataType pData){
+sint_t cdstreamPutVal(CDStream_t* pStream, CDBuffDataType_t pData){
    CDstreamFunctLastERROR=0;   
    if( pStream== NULL ){CDstreamFunctLastERROR=-1; return -1; }
-   if(( pStream->errors & CDSTREAMERR_UNITIALIZED )!=0){CDstreamFunctLastERROR=-2; return -2;}
-   
-   if(   pStream->posWrite >= pStream->buffSize){
+   if(( pStream->errors & CDSTREAMERR_UNITIALIZED )!=0){
+       CDstreamFunctLastERROR=-2; return -2;}
+      if(   pStream->posWrite >= pStream->buffSize){
       //error, write will be over the buffer
       pStream->errors |= CDSTREAMERR_WRITE_FULL ;
       CDstreamFunctLastERROR=-3;      
       return -3;
    }
-   pStream->buffPtr[ pStream->posWrite ]= pData;
+   pStream->buffPtr[ (uint16_t) (pStream->posWrite) ]= pData;
    pStream->posWrite++;
    return 0;
 }
 
 
-/*! \fn sint_t cdstreamPutArrayVal(CDStream_struct* pStream, CDBuffDataType *pData, CDBuffWidthType iNumData)
+/*! \fn sint_t cdstreamPutArrayVal(CDStream_t* pStream, CDBuffDataType_t *pData, CDBuffWidthType_t iNumData)
    \author Dario Cortese
    \date 30-01-2013 mod in 18-Apr-2013 
    \version 1.1
@@ -165,8 +163,8 @@ sint_t cdstreamPutVal(CDStream_struct* pStream, CDBuffDataType pData){
 #ifdef PLATFORM_BLACKFIN
 section ("L1_code")
 #endif
-sint_t cdstreamPutArrayVal(CDStream_struct* pStream, CDBuffDataType *pData, CDBuffWidthType iNumData){
-   CDBuffDataType *u16ptr; 
+sint_t cdstreamPutArrayVal(CDStream_t* pStream, CDBuffDataType_t *pData, CDBuffWidthType_t iNumData){
+   CDBuffDataType_t *u16ptr; 
    
    CDstreamFunctLastERROR =0;   
    if( pStream== NULL ){CDstreamFunctLastERROR=-1; return -1;}
@@ -178,7 +176,7 @@ sint_t cdstreamPutArrayVal(CDStream_struct* pStream, CDBuffDataType *pData, CDBu
       CDstreamFunctLastERROR=-3;      
       return -3;
    }
-   u16ptr = &pStream->buffPtr[ pStream->posWrite ];
+   u16ptr = &pStream->buffPtr[ (uint16_t)(pStream->posWrite) ];
    pStream->posWrite += iNumData;
    for(;iNumData>0;iNumData--){
       *u16ptr = *pData;
@@ -192,7 +190,7 @@ sint_t cdstreamPutArrayVal(CDStream_struct* pStream, CDBuffDataType *pData, CDBu
 
 
 
-/*! \fn CDBuffWidthType cdstreamGetNumVals(CDStream_struct* pStream)
+/*! \fn CDBuffWidthType_t cdstreamGetNumVals(CDStream_t* pStream)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013 
    \version 1.1
@@ -204,7 +202,7 @@ sint_t cdstreamPutArrayVal(CDStream_struct* pStream, CDBuffDataType *pData, CDBu
    \see cdstreamGetError  
    \todo re-test it
 */
-CDBuffWidthType cdstreamGetNumVals(CDStream_struct* pStream){
+CDBuffWidthType_t cdstreamGetNumVals(CDStream_t* pStream){
    sint32_t numB;
 
    CDstreamFunctLastERROR=0;   
@@ -234,12 +232,12 @@ CDBuffWidthType cdstreamGetNumVals(CDStream_struct* pStream){
       }
       return 0; //no data in the stream
    }
-   return numB;   //return the number of bytes (a positive number more than 0)
+   return (unsigned)numB;   //return the number of bytes (a positive number more than 0)
 }
 
 
 
-/*! \fn CDBuffDataType  cdstreamPregetVal(CDStream_struct* pStream)
+/*! \fn CDBuffDataType_t  cdstreamPregetVal(CDStream_t* pStream)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013 
    \version 1.1
@@ -252,9 +250,9 @@ CDBuffWidthType cdstreamGetNumVals(CDStream_struct* pStream){
    \see cdstreamGetError, CDstreamFunctLastERROR  
    \todo re-test it
 */
-CDBuffDataType  cdstreamPregetVal(CDStream_struct* pStream){
-   CDBuffDataType val;
-   CDBuffWidthType numB;
+CDBuffDataType_t  cdstreamPregetVal(CDStream_t* pStream){
+   CDBuffDataType_t val;
+   CDBuffWidthType_t numB;
    
    CDstreamFunctLastERROR=0;
    if( pStream== NULL ){
@@ -278,13 +276,13 @@ CDBuffDataType  cdstreamPregetVal(CDStream_struct* pStream){
      return 0;
    }   
    //if numB > 0 then
-   val= pStream->buffPtr[ pStream->posRead ];
+   val= pStream->buffPtr[ (uint16_t)(pStream->posRead) ];
    return val; //compiler convert it   
 }
 
 
 
-/*! \fn CDBuffDataType cdstreamGetVal(CDStream_struct* pStream)
+/*! \fn CDBuffDataType_t cdstreamGetVal(CDStream_t* pStream)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013 
    \version 1.1
@@ -297,8 +295,8 @@ CDBuffDataType  cdstreamPregetVal(CDStream_struct* pStream){
    \see cdstreamGetError  
    \todo re-test it
 */
-CDBuffDataType  cdstreamGetVal(CDStream_struct* pStream){
-   CDBuffDataType val;
+CDBuffDataType_t  cdstreamGetVal(CDStream_t* pStream){
+   CDBuffDataType_t val;
 
    //useless, zeroed in the called function CDstreamFunctLastERROR=0;
    val = cdstreamPregetVal(pStream);
@@ -315,7 +313,7 @@ CDBuffDataType  cdstreamGetVal(CDStream_struct* pStream){
 
 
 
-/*! \fn uint8_t cdstreamGetError(CDStream_struct* pStream)
+/*! \fn uint8_t cdstreamGetError(CDStream_t* pStream)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013
    \version 1.0
@@ -325,7 +323,7 @@ CDBuffDataType  cdstreamGetVal(CDStream_struct* pStream){
    \note see STREAMERR_....
    \todo re-test it
 */
-uint8_t cdstreamGetError(CDStream_struct* pStream){
+uint8_t cdstreamGetError(CDStream_t* pStream){
    uint32_t errval;
 
    CDstreamFunctLastERROR=0;
@@ -344,7 +342,7 @@ uint8_t cdstreamGetError(CDStream_struct* pStream){
 
 
 
-/*! \fn sint_t cdstreamFlush(CDStream_struct* pStream)
+/*! \fn sint_t cdstreamFlush(CDStream_t* pStream)
    \author Dario Cortese
    \date 26-07-2012 mod in 18-Apr-2013 
    \version 1.1
@@ -355,7 +353,7 @@ uint8_t cdstreamGetError(CDStream_struct* pStream){
    \see cdstreamGetError  
    \todo re-test it
 */
-sint_t cdstreamFlush(CDStream_struct* pStream){
+sint_t cdstreamFlush(CDStream_t* pStream){
    //sint32_t numB;
    
    CDstreamFunctLastERROR=0;
@@ -371,7 +369,7 @@ sint_t cdstreamFlush(CDStream_struct* pStream){
 
 
 
-/*! \fn CDBuffDataType cdstreamRemoveLastVal(CDStream_struct* pStream)
+/*! \fn CDBuffDataType_t cdstreamRemoveLastVal(CDStream_t* pStream)
    \author Dario Cortese
    \date 31-07-2012 mod in 18-Apr-2013
    \version 1.1
@@ -381,8 +379,8 @@ sint_t cdstreamFlush(CDStream_struct* pStream){
    \note after return of this function see CDstreamFunctLastERROR il less than zero
    \todo re-test it
 */
-CDBuffDataType cdstreamRemoveLastVal(CDStream_struct* pStream){
-   CDBuffDataType val;
+CDBuffDataType_t cdstreamRemoveLastVal(CDStream_t* pStream){
+   CDBuffDataType_t val;
 
    CDstreamFunctLastERROR=0;
    if( pStream== NULL ){CDstreamFunctLastERROR=-1; return 0;}
@@ -390,13 +388,13 @@ CDBuffDataType cdstreamRemoveLastVal(CDStream_struct* pStream){
    if(pStream->posWrite < 1){CDstreamFunctLastERROR=-3; return 0;}
    //if(pStream->posWrite >= 1){
       pStream->posWrite--;
-      val = pStream->buffPtr[ pStream->posWrite ];
+      val = pStream->buffPtr[ (uint16_t)(pStream->posWrite) ];
       return val;   
    //}
 }
 
 
-/*! \fn CDBuffDataWidth cdstreamPutAvilableVals(CDStream_struct* pStream)
+/*! \fn CDBuffDataWidth cdstreamPutAvilableVals(CDStream_t* pStream)
    \author Dario Cortese
    \date 30-07-2012 mod in 18-Apr-2013
    \version 1.1
@@ -408,8 +406,8 @@ CDBuffDataType cdstreamRemoveLastVal(CDStream_struct* pStream){
    \see ccstreamGetError  
    \todo re-test it
 */
-CDBuffWidthType cdstreamPutAvilableVals(CDStream_struct* pStream){
-   CDBuffWidthType numB;
+CDBuffWidthType_t cdstreamPutAvilableVals(CDStream_t* pStream){
+   CDBuffWidthType_t numB;
 
    CDstreamFunctLastERROR=0;
    if( pStream== NULL ) {CDstreamFunctLastERROR=-1; return 0;}
@@ -430,7 +428,7 @@ CDBuffWidthType cdstreamPutAvilableVals(CDStream_struct* pStream){
 //*********************************************************************************************************************
 //*********************************************************************************************************************
 
-/*!   \fn sint16_t cdstream8ToUINT8(CDStream_struct* cds){
+/*!   \fn sint16_t cdstream8ToUINT8(CDStream_t* cds){
    \author Dario Cortese
    \date 31-07-2012 mod in 18-Apr-2013
    \version 1.1
@@ -443,15 +441,15 @@ CDBuffWidthType cdstreamPutAvilableVals(CDStream_struct* pStream){
    \note if the wanted value is a signed int8 then cast the returned value to it after you have checked the negative value for errors
    \todo re-test it
 */
-sint16_t cdstream8ToUINT8(CDStream_struct* cds){
-   CDBuffDataType val; 
+sint16_t cdstream8ToUINT8(CDStream_t* cds){
+   CDBuffDataType_t val; 
    //useless because following function execute same action:CDstreamFunctLastERROR=0;
    val= cdstreamGetVal(cds);
    if(CDstreamFunctLastERROR<0) return CDstreamFunctLastERROR;
    return val&0xFF;
 }
 
-/*!   \fn sint32_t cdstream8ToUINT16(CDStream_struct* cds){
+/*!   \fn sint32_t cdstream8ToUINT16(CDStream_t* cds){
    \author Dario Cortese
    \date 31-07-2012 mod in 18-Apr-2013
    \version 1.1
@@ -464,19 +462,19 @@ sint16_t cdstream8ToUINT8(CDStream_struct* cds){
    \note if the wanted value is a signed int16 then cast the returned value to it after you have checked the negative value for errors
    \todo re-test it
 */
-sint32_t cdstream8ToUINT16(CDStream_struct* cds){
-   CDBuffDataType val;
-   CDBuffDataType val2;
+sint32_t cdstream8ToUINT16(CDStream_t* cds){
+   CDBuffDataType_t val;
+   CDBuffDataType_t val2;
 
    val= cdstreamGetVal(cds);
    if(CDstreamFunctLastERROR<0) return CDstreamFunctLastERROR;
    val2= cdstreamGetVal(cds);
    if(CDstreamFunctLastERROR<0) return CDstreamFunctLastERROR;
-   return ((val2&0xFF)+((((uint16_t)val)<<8)&0xFF00));
+   return ((val2 & 0xFF) + ((( (uint16_t)val) <<8 ) & 0xFF00 ) );
 }
 
 
-/*!   \fn sint_t cdstream8ToUINT32(CDStream_struct* cds,uint32_t* ptrVal){
+/*!   \fn sint_t cdstream8ToUINT32(CDStream_t* cds,uint32_t* ptrVal){
    \author Dario Cortese
    \date 31-07-2012 mod in 18-Apr-2013
    \version 1.1
@@ -490,11 +488,11 @@ sint32_t cdstream8ToUINT16(CDStream_struct* cds){
    \note if the wanted value is a signed int32 then cast the returned value to it after you have checked if the returned value is negative (to check errors)
    \todo re-test it
 */
-sint_t cdstream8ToUINT32(CDStream_struct* cds, uint32_t* ptrVal){
-   CDBuffDataType val;
-   CDBuffDataType val2;
-   CDBuffDataType val3;
-   CDBuffDataType val4;
+sint_t cdstream8ToUINT32(CDStream_t* cds, uint32_t* ptrVal){
+   CDBuffDataType_t val;
+   CDBuffDataType_t val2;
+   CDBuffDataType_t val3;
+   CDBuffDataType_t val4;
 
    val= cdstreamGetVal(cds);
    if(CDstreamFunctLastERROR<0) return CDstreamFunctLastERROR;
@@ -508,14 +506,14 @@ sint_t cdstream8ToUINT32(CDStream_struct* cds, uint32_t* ptrVal){
    //*ptrVal +=(        (val2 <<16) & 0x00FF0000);
    //*ptrVal +=(        (val3 <<8)  & 0x0000FF00);
    //*ptrVal +=(         val4       & 0x000000FF);
-   *ptrVal= ((((uint32_t)val<<24)&0xFF000000)+(((uint32_t)val2<<16)&0xFF0000)+(((uint16_t)val3<<8)&0xFF00)+(val4&0xFF));
+   *ptrVal= ((( (uint32_t)val <<24 ) & 0xFF000000) + (( (uint32_t)val2 <<16 ) & 0xFF0000 ) + (( (uint16_t)val3 <<8 ) & 0xFF00 ) + ((uint8_t)val4 & 0xFF ) );
    return 0; //all ok
 }
 
 
 
 
-/*! \fn sint_t UINT8toCDStream8(CDStream_struct* cds, uint8_t pByte)
+/*! \fn sint_t UINT8toCDStream8(CDStream_t* cds, uint8_t pByte)
    \author Dario Cortese
    \date 02-08-2012
    \version 1.0
@@ -525,13 +523,13 @@ sint_t cdstream8ToUINT32(CDStream_struct* cds, uint32_t* ptrVal){
    \return 0 or positive number if all ok, otherwise return -1 or negative numbers to indicates errors
    \note after return of this function see CDstreamFunctLastERROR il less than zero
 */
-sint_t UINT8toCDStream8(CDStream_struct* cds, uint8_t pByte){
+sint_t UINT8toCDStream8(CDStream_t* cds, uint8_t pByte){
    return cdstreamPutVal(cds, pByte);
 }
 
 
 
-/*! \fn sint_t UINT16toCDStream8(CDStream_struct* cds, uint16_t pDiByte)
+/*! \fn sint_t UINT16toCDStream8(CDStream_t* cds, uint16_t pDiByte)
    \author Dario Cortese
    \date 02-08-2012 mod in 18-Apr-2013
    \version 1.1
@@ -542,7 +540,7 @@ sint_t UINT8toCDStream8(CDStream_struct* cds, uint8_t pByte){
    \note after return of this function see CDstreamFunctLastERROR il less than zero
    \todo re-test it
 */
-sint_t UINT16toCDStream8(CDStream_struct* cds, uint16_t pDiByte){
+sint_t UINT16toCDStream8(CDStream_t* cds, uint16_t pDiByte){
    //check if in streamer there is almost two bytes free
    if(cdstreamPutAvilableVals(cds)<2){CDstreamFunctLastERROR=-20; return -20;}
    cdstreamPutVal(cds, (uint8_t)(pDiByte>>8));
@@ -551,7 +549,7 @@ sint_t UINT16toCDStream8(CDStream_struct* cds, uint16_t pDiByte){
 }
 
 
-/*! \fn sint_t UINT24toCDStream8(CDStream_struct* cds, uint32_t pQuadByte)
+/*! \fn sint_t UINT24toCDStream8(CDStream_t* cds, uint32_t pQuadByte)
    \author Dario Cortese
    \date 25-10-2012 mod in 18-Apr-2013
    \version 1.1
@@ -562,7 +560,7 @@ sint_t UINT16toCDStream8(CDStream_struct* cds, uint16_t pDiByte){
    \return 0 or positive number if all ok, otherwise return -1 or negative numbers to indicates errors
    \todo re-test it
 */
-sint_t UINT24toCDStream8(CDStream_struct* cds, uint32_t pQuadByte){
+sint_t UINT24toCDStream8(CDStream_t* cds, uint32_t pQuadByte){
    //check if in streamer there is almost four bytes free
    if(cdstreamPutAvilableVals(cds)<3){CDstreamFunctLastERROR=-20; return -20;}
    cdstreamPutVal(cds, (uint8_t)(pQuadByte>>16));
@@ -572,7 +570,7 @@ sint_t UINT24toCDStream8(CDStream_struct* cds, uint32_t pQuadByte){
 }
 
 
-/*! \fn sint_t UINT32toCDStream8(CDStream_struct* cds, uint32_t pQuadByte)
+/*! \fn sint_t UINT32toCDStream8(CDStream_t* cds, uint32_t pQuadByte)
    \author Dario Cortese
    \date 02-08-2012 mod in 18-Apr-2013
    \version 1.1
@@ -583,7 +581,7 @@ sint_t UINT24toCDStream8(CDStream_struct* cds, uint32_t pQuadByte){
    \note after return of this function see CDstreamFunctLastERROR il less than zero
    \todo re-test it
 */
-sint_t UINT32toCDStream8(CDStream_struct* cds, uint32_t pQuadByte){
+sint_t UINT32toCDStream8(CDStream_t* cds, uint32_t pQuadByte){
    //check if in streamer there is almost four bytes free
    if(cdstreamPutAvilableVals(cds)<4){CDstreamFunctLastERROR=-20; return -20;}
    
@@ -596,7 +594,7 @@ sint_t UINT32toCDStream8(CDStream_struct* cds, uint32_t pQuadByte){
 
 
 
-/*! \fn sint_t cdstreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuffWidthType numOfVals){
+/*! \fn sint_t cdstreamToCDStream(CDStream_t* org, CDStream_t* dest, CDBuffWidthType_t numOfVals){
    \author Dario Cortese
    \date 03-08-2012 mod in 18-Apr-2013
    \version 1.1
@@ -625,11 +623,11 @@ sint_t UINT32toCDStream8(CDStream_struct* cds, uint32_t pQuadByte){
    \note after return of this function see CDstreamFunctLastERROR il less than zero
    \todo re-test it
 */
-sint_t cdstreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuffWidthType numOfVals){
-   CDBuffDataType val;
-   CDBuffWidthType Appo;
-   CDBuffWidthType posGet;
-   CDBuffWidthType posPut;
+sint_t cdstreamToCDStream(CDStream_t* org, CDStream_t* dest, CDBuffWidthType_t numOfVals){
+   CDBuffDataType_t val;
+   CDBuffWidthType_t Appo;
+   CDBuffWidthType_t posGet;
+   CDBuffWidthType_t posPut;
 
    CDstreamFunctLastERROR=0;   
    if( numOfVals==0) return 0;   //nothing to do
@@ -674,7 +672,7 @@ sint_t cdstreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuffWid
 }
 
 
-/*! \fn sint_t fastCDStreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuffWidthType numOfVals)
+/*! \fn sint_t fastCDStreamToCDStream(CDStream_t* org, CDStream_t* dest, CDBuffWidthType_t numOfVals)
    \author Dario Cortese
    \date 03-08-2012 mod in 18-Apr-2013
    \version 1.1
@@ -699,11 +697,11 @@ sint_t cdstreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuffWid
    \see cdsstreamToCDStream
    \todo re-test it
 */
-sint_t fastCDStreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuffWidthType numOfVals){
-   CDBuffWidthType Appo;
-   CDBuffWidthType iCount;
-   CDBuffDataType *buffOrgPtr;
-   CDBuffDataType *buffDestPtr;
+sint_t fastCDStreamToCDStream(CDStream_t* org, CDStream_t* dest, CDBuffWidthType_t numOfVals){
+   CDBuffWidthType_t Appo;
+   CDBuffWidthType_t iCount;
+   CDBuffDataType_t *buffOrgPtr;
+   CDBuffDataType_t *buffDestPtr;
    
    CDstreamFunctLastERROR=0;
    if( numOfVals==0) return 0;   //nothing to do
@@ -717,8 +715,8 @@ sint_t fastCDStreamToCDStream(CDStream_struct* org, CDStream_struct* dest, CDBuf
    //buffOrgPtr= &org.buffPtr[ org->posRead ]);
    //buffDestPtr= &dest.buffPtr[ dest->posWrite ]);
    
-   buffOrgPtr= &(org->buffPtr[ org->posRead ]);
-   buffDestPtr= &(dest->buffPtr[ dest->posWrite ]);
+   buffOrgPtr= &(org->buffPtr[ (uint16_t)(org->posRead) ]);
+   buffDestPtr= &(dest->buffPtr[ (uint16_t)(dest->posWrite) ]);
    
    for(iCount = numOfVals; iCount != 0; iCount--){
       *buffDestPtr = *buffOrgPtr;

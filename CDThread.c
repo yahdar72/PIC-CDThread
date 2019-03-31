@@ -6,8 +6,9 @@
 //// without written permission.                                        ////
 ////                                                                    ////
 //// Author: Dario Cortese                                              ////
-//// Client: myself                                                     ////
-//// Created on 10/08/2012 modified on 01/11/2015 to adapt CCS compiler ////
+//// Client: Mongoose srl (Mariano Cerbone)                             ////
+//// Created on 10/08/2012                                              ////
+//// Modify on 03/07/2018 to be adapted at CCS compiler                 ////
 //// File: cdThread.c                                                   ////
 //// Description:                                                       ////
 //// THIS FILE HAVE ALL IMPLEMENTATION OF FUNCTION USED FOR CDTHREAD    ////
@@ -25,17 +26,27 @@
 #endif
 
 //used to inform extern code which is the last executed thread function called by thread_engine
-cdThreadID_t LASTCALLEDTHREADIDBYENGINE;
+cdThreadID_t LASTCALLEDTHREADIDBYENGINE; 
 
 
 //advise external code which is the last called thread by user
-cdThreadID_t LASTCALLEDTHREADIDBYUSER;
+cdThreadID_t LASTCALLEDTHREADIDBYUSER;   
+
 
 
 //is the system array that stores the cdthread structure used to manage threads
-cdthreadStruct  cdthreadsSystemArray[CDTHREAD_MAX_NUM_THREADS];
+#ifdef PLATFORM_BLACKFIN
+section("L1_data_b")  cdThreadStruct_t  cdthreadsSystemArray[CDTHREAD_MAX_NUM_THREADS];
+#else
+cdThreadStruct_t  cdthreadsSystemArray[CDTHREAD_MAX_NUM_THREADS];
+#endif
+//COMMENTED BECAUSE ALLOCATED IN memory_alloc.c
+
+//if PIC
 //to avoid array splitting located at the start of BANK1 gen Pourpose area (80 bytes), avery message struct is 10 bytes, so 8 thread max
-#locate cdthreadsSystemArray = 0xA0
+//#locate cdthreadsSystemArray = 0xA0
+
+
 
 
 
@@ -59,18 +70,37 @@ cdthreadStruct  cdthreadsSystemArray[CDTHREAD_MAX_NUM_THREADS];
 cdThreadID_t cdthread_ThreadToRun(cdThreadID_t LastRunnedIndex){
 
    cdThreadID_t thidx;
-   cdthreadStruct* p;
-   
+   cdThreadStruct_t* p;
+   static int isAlwaysTh = 1;  //this imply that first thread is tread_always
+
+    //checks if will be thread_always to start
+    if(isAlwaysTh != 0 ){
+        isAlwaysTh = 0; //indicates that next time will be a standard thread to start
+        //checks if actual analyzed thread is enabled, also disabled if destroyed so useless checks also if destroyed
+        if( cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].Priority != CDTHREADPRIORITY_DISABLED ){
+              return CDTHREAD_ALWAYSTHREAD_INDEX;
+        }else if (cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].Wakeup == CDTHREADWAKEUP_BYMESSAGE){
+        //checks if there is a message and wakeup by message is sets
+           if (cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].MessagesCounter > 0 ){
+               cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].Priority = CDTHREADPRIORITY_ENABLED;   //enable the thread
+               cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].Wakeup = CDTHREADWAKEUP_DISABLED; //disable the wait message
+               return CDTHREAD_ALWAYSTHREAD_INDEX;
+           }
+        }
+    }//else{
+    isAlwaysTh = 1; //so next time that reenter will be thread_always to start
+    //}
    //if last values is
-   if(LastRunnedIndex < 0)
-       LastRunnedIndex=-1; //only for ensurance
-   else if(LastRunnedIndex >= CDTHREAD_MAX_NUM_THREADS )
-       LastRunnedIndex=-1; //only for ensurance
+   if((LastRunnedIndex < CDTHREAD_ALWAYSTHREAD_INDEX) || (LastRunnedIndex >= CDTHREAD_MAX_NUM_THREADS ))
+       LastRunnedIndex = CDTHREAD_ALWAYSTHREAD_INDEX ; //remember that index 0 now is used for thread_always but when enter in the loop will be add one
+       //LastRunnedIndex = -1 ; //only for ensurance
    
-   //check if lastRunnedThread is the last of available thread
+   //check if lastRunnedThread is not the last of available thread
    if( LastRunnedIndex < (CDTHREAD_MAX_NUM_THREADS - 1) ){
       for(thidx= LastRunnedIndex+1; thidx < CDTHREAD_MAX_NUM_THREADS; thidx++){
-          p = &cdthreadsSystemArray[thidx];
+          //p = &(cdthreadsSystemArray[thidx]);
+          p = &(cdthreadsSystemArray[0]);
+          p += (uint16_t)thidx;
          //checks if actual analyzed thread is thread_engine managed
          if(cdthread_isEngineManagedID( p->ID)){
              //checks if actual analyzed thread is enabled, also disabled if destroyed so useless checks also if destroyed
@@ -89,11 +119,15 @@ cdThreadID_t cdthread_ThreadToRun(cdThreadID_t LastRunnedIndex){
    } //end if( LastRunnedIndex < (CDTHREAD_MAX_NUM_THREADS - 1))
    
    //if arrived here means that previous search (from LastRunnedIndex to end of cdthread array) has no success so...
-   //if the last runnedindex isn't the first elements of cdthread array then execute a search from start of cdthread array to the LastRunnedIndex  
+   //if the last runned index isn't the first elements of cdthread array then execute a search from start of cdthread array to the LastRunnedIndex  
    
       //restart from first (first idx is 0 that is eaqul to threadid 1) to last runnedIndex
-      for(thidx=0 ; thidx <= LastRunnedIndex ; thidx++){
-          p = &cdthreadsSystemArray[thidx];
+      //for(thidx=0 ; thidx <= LastRunnedIndex ; thidx++){
+      //remember that now index 0 is used for thjread_always and cannot be used for standard thread
+      for(thidx = CDTHREAD_ALWAYSTHREAD_INDEX + 1 ; thidx <= LastRunnedIndex ; thidx++){
+          //p = &cdthreadsSystemArray[thidx];
+          p = &cdthreadsSystemArray[0];
+          p += (uint16_t)thidx;
          //checks if actual analyzed thread is thread_engine managed
          if(cdthread_isEngineManagedID( p->ID)){
              //checks if actual analyzed thread is enabled
@@ -106,7 +140,7 @@ cdThreadID_t cdthread_ThreadToRun(cdThreadID_t LastRunnedIndex){
                     p->Wakeup = CDTHREADWAKEUP_DISABLED; //disable the wait message
                     return thidx;
                 }
-             }
+            }
          }
       } //end for(thidx= LastRunnedIndex +1; thidx < CDTHREAD_MAX_NUM_THREADS; thidx++)
    
@@ -129,20 +163,22 @@ cdThreadID_t cdthread_ThreadToRun(cdThreadID_t LastRunnedIndex){
    \warning this function must be placed in main infinite loop
 */
 sint_t cdthread_Engine(void){
-   static cdThreadID_t LastThIndex;
+   static cdThreadID_t LastThIndex = -1;
    cdThreadID_t nextThIndex;
    sint_t retVal;   //exit value: 0=not called function, 1 called function with exitcode positive (ok), -1 called function with exit code negative (error)
 
-   cdthreadStruct* thptr;
+   cdThreadStruct_t* thptr;
    cdThreadID_t cdthid;
    cdtreadFunctionType ptrFunc;
-   int isFirstTime;
-   int exitState;
+   sint_t isFirstTime;
+   sint_t exitState;
    
    nextThIndex = cdthread_ThreadToRun(LastThIndex);
    retVal = 0; //used to indicate if nothing run
    if((nextThIndex >=0 )&&(nextThIndex < CDTHREAD_MAX_NUM_THREADS)){
-      thptr = &cdthreadsSystemArray[nextThIndex];
+      //thptr = &cdthreadsSystemArray[(unsigned)nextThIndex];
+       thptr = &cdthreadsSystemArray[0];
+       thptr += (uint16_t)nextThIndex;
       //Following test isn't implementable in CCS compiler, so removed
       //check if call back function exist;
       //if(thptr->cdtreadFunction != CDTHREADFUNCTION_NOFUNCTION){
@@ -153,7 +189,10 @@ sint_t cdthread_Engine(void){
          //call the callback function
          exitState = thptr->LastExitState;
          exitState = (*ptrFunc)( isFirstTime, cdthid, exitState);
-         thptr->isTheFirstTime = FALSE;   //after now sign this thread as "not the first time" that is called
+         //reset isTheFirstTime flag only if before to call function was true, otherwise
+         // avoid to change it. This check allow to change isTheFirstTime inside the called function
+         if(isFirstTime)
+            thptr->isTheFirstTime = FALSE;   //after now sign this thread as "not the first time" that is called
          //store actual exitcode for this thread
          thptr->LastExitState = exitState;
          LASTCALLEDTHREADIDBYENGINE = cdthid;   //advise external code which is the last called thread by engine
@@ -166,14 +205,17 @@ sint_t cdthread_Engine(void){
       //}
    }
    //store index for next call
-   LastThIndex = nextThIndex;
+   //avoid to store LastThIndex if was thread_always to run 
+   if (nextThIndex != CDTHREAD_ALWAYSTHREAD_INDEX){
+       LastThIndex = nextThIndex;
+   }
    return retVal;
 }
 
 
 
 
-/*! \fn sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, int* exitCode)
+/*! \fn sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, sint_t* exitCode)
    \author Dario Cortese
    \date 10-08-2012 modified 2015-11-04
    \brief call function of thread, if thread is enabled and id is good (no errors); return true if called, otherwise false
@@ -187,19 +229,24 @@ sint_t cdthread_Engine(void){
    \param exitCode is returned value by called thread_function
    \return true if function was called, false if for error, or simply because thread is disabled, the function was not called
 */
-sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, int* exitCode){
+#ifdef PLATFORM_BLACKFIN
+section ("L1_code")
+#endif
+sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, sint_t* exitCode){
    cdThreadID_t realidx;
-   cdthreadStruct* thptr;
+   cdThreadStruct_t* thptr;
    cdThreadID_t cdthid;
    cdtreadFunctionType ptrFunc;
-   int isFirstTime;
-   int exitState;
+   sint_t isFirstTime;
+   sint_t exitState;
       
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
-   thptr = &cdthreadsSystemArray[realidx];
+   //thptr = &cdthreadsSystemArray[(unsigned)realidx];
+   thptr = &cdthreadsSystemArray[0];
+   thptr += (uint16_t)realidx;
    //check if thread was destroyed
    if( thptr->ID == CDTHREADID_ERROR) return FALSE;
    //check if disabled
@@ -232,7 +279,7 @@ sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, int* exitCode){
       return TRUE;
    //}
    //if arrives here means no called function so singnaling an error
-   return FALSE;
+   //return FALSE;
 }
 
 
@@ -244,7 +291,7 @@ sint_t cdthread_UserCallThreadFunction(cdThreadID_t pThId, int* exitCode){
 //a is a boolena than indicates if is the first time that thread is called
 //b it the thread structure used to manage the thread that call this function (trhead function)
 //c is the previous ecit state
-sint_t CDTHREADFUNCTION_NOFUNCTION(int a, cdThreadID_t b , int c)
+sint_t CDTHREADFUNCTION_NOFUNCTION(sint_t a, cdThreadID_t b , sint_t c)
 {
     //do nothing
     return -1;
@@ -258,17 +305,23 @@ sint_t CDTHREADFUNCTION_NOFUNCTION(int a, cdThreadID_t b , int c)
    \version 1.00
 */
 void cdthread_initAll(void){
-   int idx;
+   uint16_t idx;
+   cdThreadStruct_t actptr;
    for(idx=0; idx < CDTHREAD_MAX_NUM_THREADS; idx++){
-      cdthreadsSystemArray[idx].ID=CDTHREADID_ERROR;   //free/available position
-      cdthreadsSystemArray[idx].Priority=CDTHREADPRIORITY_DISABLED;
-      cdthreadsSystemArray[idx].Wakeup = CDTHREADWAKEUP_DISABLED;
-      cdthreadsSystemArray[idx].cdtreadFunction = CDTHREADFUNCTION_NOFUNCTION;   //no associated function
-      cdthreadsSystemArray[idx].LastExitState =0;         //default value
-      cdthreadsSystemArray[idx].isTheFirstTime = TRUE;   //so when vill be activated that condition will be true
-      cdthreadsSystemArray[idx].MessagesCounter=0;      //no messages
-      cdthreadsSystemArray[idx].FirstMsgID = CDMESSAGEID_ERROR;      //no first message 
-      cdthreadsSystemArray[idx].LastMsgID = CDMESSAGEID_ERROR;      //no last message
+      actptr = &cdthreadsSystemArray[(uint16_t)idx];
+      actptr->ID = CDTHREADID_ERROR;   //free/available position
+      actptr->Priority = CDTHREADPRIORITY_DISABLED;
+      actptr->Wakeup = CDTHREADWAKEUP_DISABLED;
+      actptr->cdtreadFunction = CDTHREADFUNCTION_NOFUNCTION;   //no associated function
+      actptr->LastExitState = 0;         //default value
+      actptr->isTheFirstTime = TRUE;   //so when vill be activated that condition will be true
+      actptr->MessagesCounter = 0;      //no messages
+      actptr->FirstMsgID = CDMESSAGEID_ERROR;      //no first message 
+      actptr->LastMsgID = CDMESSAGEID_ERROR;      //no last message
+      actptr->LogName[0] = 0;
+      actptr->LogName[1] = 0;
+      actptr->LogName[2] = 0;
+      actptr->LogName[3] = 0;
    }
 }
 
@@ -287,28 +340,36 @@ cdThreadID_t cdthread_getFreeID(void){
    //uses static id so next time that a new thread position is requested, start from a new position and avoid to 
    //reuse position until array end is reached  
    cdThreadID_t starting_idx;
-   static cdThreadID_t idx=0;
+   //static cdThreadID_t idx=0;
+   static cdThreadID_t idx = 1;  //remember index 0 used for thread_always
    //because cdThreadID_t now is signed, then this test must be performed to avoid error
-   if(idx < 0) idx=0;
-   if(idx >= CDTHREAD_MAX_NUM_THREADS) idx=0;
+   //if(idx < 0) idx = 0;
+   if(idx < 0)
+       idx = 1;//remember index 0 used for thread_always
+   //if(idx >= CDTHREAD_MAX_NUM_THREADS) idx=0;
+   if(idx >= CDTHREAD_MAX_NUM_THREADS)
+       idx = 1; //remember index 0 used for thread_always
    starting_idx = idx;
+   
    for(; idx < CDTHREAD_MAX_NUM_THREADS; idx++){
-      if(cdthreadsSystemArray[idx].ID == CDTHREADID_ERROR){
-         idx++;   //so next time that reenter use next new position
+      if(cdthreadsSystemArray[(uint16_t)idx].ID == CDTHREADID_ERROR){
+         idx++;   //so next time that reenter, and is not trhead_always to start, use next new position
          //return (idx +1);   //ID is always the real array index +1, because id=0 means unused/free
          return idx;
       }
    }
-   //if first search, searching from last idx has no positive result (otherwire exit with return and doesn't arrives here)
-   // then execute a second search starting from 0
-   if (starting_idx != 0){ //as is starting_idx>0 but more fast
-       for(idx=0; idx < starting_idx; idx++){
-          if(cdthreadsSystemArray[idx].ID == CDTHREADID_ERROR){
-             idx++;   //so next time that reenter use next new position
-             //return (idx +1);   //ID is always the real array index +1, because id=0 means unused/free
-             return idx;
-          }
-       }
+   //if first search, searching from last idx has no positive result 
+   // then execute a second search starting from 1 (was 0 but now the 0 index used for thread_always))
+   //if (starting_idx != 0){ //as is starting_idx>0 but more fast
+   if (starting_idx > 1){ 
+       //for(idx=0; idx < starting_idx; idx++){
+       for(idx = 1; idx < starting_idx; idx++){
+          if(cdthreadsSystemArray[(uint16_t)idx].ID == CDTHREADID_ERROR){
+          idx++;   //so next time that reenter, and is not trhead_always to start, use next new position
+         //return (idx +1);   //ID is always the real array index +1, because id=0 means unused/free
+         return idx;
+      }
+   }
    } //end if (starting_idx>0)
    //if also second search has no positive result then this means that there isn't available trread id free, at compiling time
    // increments CDTHREAD_MAX_NUM_THREADS define, or check if some thread is many time allocated without destroy   
@@ -333,10 +394,10 @@ cdThreadID_t cdthread_getArrayIdxFromID(cdThreadID_t pThId){
 
    //convert pThId in real index for cdthreadsSystemArray
    if(cdthread_isUserManagedID( pThId )){
-      realidx = (int)pThId * (-1);
+      realidx = (sint_t)pThId * (-1);
       realidx--;
    }else{
-      realidx = (int)pThId;
+      realidx = (sint_t)pThId;
       realidx--;
    }
    return realidx;
@@ -355,13 +416,17 @@ cdThreadID_t cdthread_getArrayIdxFromID(cdThreadID_t pThId){
    \note ONLY FOR INTERNAL USE
    \version 1.00
 */
-cdthreadStruct* cdthread_getPointerToStruct(cdThreadID_t pThId){
+cdThreadStruct_t* cdthread_getPointerToStruct(cdThreadID_t pThId){
    cdThreadID_t realidx;
+   cdThreadStruct_t* p;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
-   if( realidx<0 ) return (cdthreadStruct*)0x00000000; 
-   return &cdthreadsSystemArray[realidx];
+   if( realidx<0 ) return (cdThreadStruct_t*)0x00000000; 
+   //return &cdthreadsSystemArray[(unsigned)realidx];
+   p = &cdthreadsSystemArray[0];
+   p += (uint16_t)realidx;
+   return p;
 } 
 
 
@@ -371,9 +436,9 @@ cdthreadStruct* cdthread_getPointerToStruct(cdThreadID_t pThId){
 
 
 
-/*! \fn int cdthread_new(cdThreadID* pThId, cdtreadFunctionType ptrFunction)
+/*! \fn sint_t cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, char * pLogName)
    \author Dario Cortese
-   \date 08-08-2012, mod 06-Apr-2013,  updated 2015-11-04
+   \date 08-08-2012, mod 10-Mar-2019
    \brief creates a new thread for Thread_Engine; after creation the thread is disabled, doesn't have messages and the firsttime is set to true
    Checks if passed id (pThId) is unused/ previously destroyed thread id and return an error if id already used.
    \n Searchs inside cdthreadsSystemArray if there is a available/free position (searhs for every position if there is a ID==CDTHREADID_ERROR, 
@@ -382,22 +447,41 @@ cdthreadStruct* cdthread_getPointerToStruct(cdThreadID_t pThId){
    \n At the end, if all ok, return the new id by pThId parameter and true as responce.
    \param pThId is cdthread (id) to verify if was free (previously destroyed) and also is the returned new thread (id); if error happens this is set to CDTHREADID_ERROR 
    \param ptrFunction is the function pointer to a function that is the called thread_function when thread run; if no function pass CDTHREADFUNCTION_NOFUNCTION
+   \param pLogName is a 4 char string with the logical, and very short, name of thread; very usefull in debug
    \return true if new thread created or false if happened a problem as thread id also used (not destroyed) or noone id is free for a new thread
    \version 1.01
 */
-int cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
+sint_t cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, const char * pLogName){
 //prev define was: cdThreadID_t cdthread_new( cdtreadFunctionType ptrFunction){
    //cdThreadID_t idx;
-   cdthreadStruct* thptr;
+   cdThreadStruct_t* thptr;
+   cdThreadID_t LocID;
+   LocID = *pThId;  
+   char LogName[] = {0,0,0,0};
+   LogName[0] = *pLogName;
+   pLogName++;
    
-   if(!cdthread_isDestroyed(*pThId)){
-      return FALSE;   //the thread id point to an existing thread (not previously destroyed and also actually used)
-   }
-   *pThId=cdthread_getFreeID();
-   if(*pThId == CDTHREADID_ERROR) return FALSE;   //means error, no available 
+   if (LogName[0] != 0)
+       LogName[1] = *pLogName;
+   pLogName++;
+   if (LogName[1] != 0)
+       LogName[2] = *pLogName;
+   pLogName++;
+   if (LogName[2] != 0)
+       LogName[3] = *pLogName;
+   
+   if(!cdthread_isDestroyed(LocID))
+       return FALSE;   //the thread id point to an existing thread (not previously destroyed and also actually used)
+   LocID = cdthread_getFreeID();
+   if(LocID == CDTHREADID_ERROR) {
+       *pThId = CDTHREADID_ERROR;
+       return FALSE;
+   }  //means error, no available 
    //the system array index is equal to |id|-1
-   thptr = &cdthreadsSystemArray[*pThId - 1];
-   thptr->ID=*pThId;
+   //thptr = &cdthreadsSystemArray[(uint16_t)( LocID - 1 )];
+   thptr = &cdthreadsSystemArray[0];
+   thptr += (uint16_t)( LocID - 1 );
+   thptr->ID = LocID;
    thptr->Priority=CDTHREADPRIORITY_DISABLED;
    thptr->Wakeup=CDTHREADWAKEUP_DISABLED;
    thptr->cdtreadFunction = ptrFunction;
@@ -405,14 +489,68 @@ int cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
    thptr->isTheFirstTime = TRUE;
    thptr->MessagesCounter=0;
    thptr->FirstMsgID = CDMESSAGEID_ERROR;
-   thptr->LastMsgID = CDMESSAGEID_ERROR;      
+   thptr->LastMsgID = CDMESSAGEID_ERROR;
+   thptr->LogName[0] = LogName[0];
+   thptr->LogName[1] = LogName[1];
+   thptr->LogName[2] = LogName[2];
+   thptr->LogName[3] = LogName[3];
+   
+   *pThId = LocID;
    return TRUE;
 } 
 
 
-/*! \fn int cdthread_newUserManaged(cdThreadID* pThId, cdtreadFunctionType ptrFunction) 
+/*! \fn sint_t cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, char * pLogName)
    \author Dario Cortese
-   \date 08-08-2012, mod 06-Apr-2013, updated 2015-11-04
+   \date 31-03-2019
+   \brief creates a new thread for Thread_Engine that run always after every other one; for example: run thread A, followed by always thread, followed by Thread B, followed by thrad Always anbd so on
+   the created thread is always placed at position 0 in system thread array, and always has index 1 for TREADID.
+   \n If previous thread is assigned at always thread this will be overwritten without any warning or error
+   \param pThId is cdthread (id) to verify if was free (previously destroyed) and also is the returned new thread (id); if error happens this is set to CDTHREADID_ERROR 
+   \param ptrFunction is the function pointer to a function that is the called thread_function when thread run; if no function pass CDTHREADFUNCTION_NOFUNCTION
+   \param pLogName is a 4 char string with the logical, and very short, name of thread; very usefull in debug
+   \return true if new thread created or false if happened a problem as thread id also used (not destroyed) or noone id is free for a new thread
+   \version 1.0
+*/
+sint_t cdthread_newAlways(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, const char * pLogName){ 
+   char LogName[] = {0,0,0,0};
+   LogName[0] = *pLogName;
+   pLogName++;
+   
+   if (LogName[0] != 0)
+       LogName[1] = *pLogName;
+   pLogName++;
+   if (LogName[1] != 0)
+       LogName[2] = *pLogName;
+   pLogName++;
+   if (LogName[2] != 0)
+       LogName[3] = *pLogName;
+   
+   if(!cdthread_isDestroyed( *pThId )) //the thread id point to an existing thread (not previously destroyed and also actually used)
+       return FALSE;   
+   //the system array index is equal to 0 for always thread
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].ID = CDTHREAD_ALWAYSTHREAD_INDEX + 1;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].Priority = CDTHREADPRIORITY_DISABLED;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].Wakeup=CDTHREADWAKEUP_DISABLED;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].cdtreadFunction = ptrFunction;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].LastExitState = 0;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].isTheFirstTime = TRUE;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].MessagesCounter=0;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].FirstMsgID = CDMESSAGEID_ERROR;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].LastMsgID = CDMESSAGEID_ERROR;
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].LogName[0] = LogName[0];
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].LogName[1] = LogName[1];
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].LogName[2] = LogName[2];
+   cdthreadsSystemArray[CDTHREAD_ALWAYSTHREAD_INDEX].LogName[3] = LogName[3];
+   *pThId = CDTHREAD_ALWAYSTHREAD_INDEX + 1 ; //return logical ID that is realID + 1
+   return TRUE;
+}
+
+
+
+/*! \fn sint_t cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, char * pLogName)
+   \author Dario Cortese
+   \date 08-08-2012, mod 10-Mar-2019
    \brief creates a new USER managed thread (not managed by Thread Engine); after creation the thread is disabled, doesn't have messages and the first time is set to true
    Checks if passed id (pThId) is unused/ previously destroyed thread id and return an error if id already used.
    \n Searchs inside cdthreadsSystemArray if there is a available/free position (searhs for every position if there is a ID==CDTHREADID_ERROR, 
@@ -422,14 +560,15 @@ int cdthread_new(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
    \n At the end, if all ok, return the new id by pThId parameter and true as responce.  
    \param pThId is cdthread (id) to verify if was free (previously destroyed) and also is the returned new thread (id); if error happens this is set to CDTHREADID_ERROR 
    \param ptrFunction is the function pointer to a function that is the called thread_function when thread run; if no function pass CDTHREADFUNCTION_NOFUNCTION
+   \param pLogName is a 4 char string with the logical, and very short, name of thread; very usefull in debug
    \return true if new thread created or false if happened a problem as thread id also used (not destroyed) or noone id is free for a new thread
    \version 1.01
 */
-int cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
+sint_t cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction, const char * pLogName){
 //prev was: cdThreadID_t cdthread_newUserManaged(cdtreadFunctionType ptrFunction)
-   int ires;
-   int previdx;
-   ires = cdthread_new( pThId, ptrFunction);
+   sint_t ires;
+   sint_t previdx;
+   ires = cdthread_new( pThId, ptrFunction, pLogName);
    if(!ires) return FALSE ; //return an error, cause must be passed id already used (not previously destroied) or unavailable thread
    if(*pThId == CDTHREADID_ERROR) return FALSE;   //means error, no available 
    //the system array real id is equal to |id|-1
@@ -437,12 +576,12 @@ int cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction
    //the user managed threads have negative id to distinguish the thread engine managed that have positive id;
    // remeber that the system array real id is equal to |id|-1 (|id| is the id without sign)
    *pThId *= - 1;
-   cdthreadsSystemArray[previdx].ID= *pThId;
+   cdthreadsSystemArray[(uint16_t)previdx].ID= *pThId;
    return TRUE;
 } 
 
 
-/*! \fn int cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction)
+/*! \fn sint_T cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction)
    \author Dario Cortese
    \date 18-09-2012 updated 2015-11-04
    \brief it changes only called function by indicated thread without change any other thread fields
@@ -455,21 +594,21 @@ int cdthread_newUserManaged(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction
    \return true if action has succes
    \version 1.00
 */
-int cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction){
+sint_t cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction){
    cdThreadID_t realidx;
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
    //checks id thread is destroyed and if destroyed return false
-   if(cdthreadsSystemArray[realidx].ID == CDTHREADID_ERROR) return FALSE;
+   if(cdthreadsSystemArray[(uint16_t)realidx].ID == CDTHREADID_ERROR) return FALSE;
    //sets the new callback thread function to thread
-   cdthreadsSystemArray[realidx].cdtreadFunction = ptrFunction;
+   cdthreadsSystemArray[(uint16_t)realidx].cdtreadFunction = ptrFunction;
    return TRUE;
 } 
 
 
 
-/*! \fn int cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction)
+/*! \fn sint_t cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction)
    \author Dario Cortese
    \date 06-04-2013 updated 2015-11-04
    \brief checks if called function by indicated thread (pThId) is the same passed (ptrFunction)
@@ -478,21 +617,21 @@ int cdthread_changeFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction)
    \return true actually thread function is the same indcated (ptrFunction), return false if also id invalid or thread destroyed 
    \version 1.00
 */
-int cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction){
+sint_t cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction){
    cdThreadID_t realidx;
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
    //checks id thread is destroyed and if destroyed return false
-   if(cdthreadsSystemArray[realidx].ID == CDTHREADID_ERROR) return FALSE;
+   if(cdthreadsSystemArray[(uint16_t)realidx].ID == CDTHREADID_ERROR) return FALSE;
    //checks the callback thread function is different by indicates
-   if(cdthreadsSystemArray[realidx].cdtreadFunction != ptrFunction) return FALSE;
+   if(cdthreadsSystemArray[(uint16_t)realidx].cdtreadFunction != ptrFunction) return FALSE;
    return TRUE;
 } 
 
 
 
-/*! \fn int cdthread_DestroyThread(cdThreadID_t pThId)
+/*! \fn sint_t cdthread_DestroyThread(cdThreadID_t pThId)
    \author Dario Cortese updated 2015-11-04
    \date 09-08-2012, last mod 06-Apr-2013
    \brief destroy the indicated thread (memory are free for another new thread), and every message associated
@@ -503,7 +642,7 @@ int cdthread_isFunction(cdThreadID_t pThId, cdtreadFunctionType ptrFunction){
    \return false if a error accurred, or true if indicated thread has been deleted 
    \version 1.01 
 */
-int cdthread_DestroyThread(cdThreadID_t* pThId){
+sint_t cdthread_DestroyThread(cdThreadID_t* pThId){
    cdThreadID_t realidx;
    //check if isn't a valid id
    //next line unusefull because cdthread_getArrayIdxFromID check it and return -1 in case of error 
@@ -514,9 +653,9 @@ int cdthread_DestroyThread(cdThreadID_t* pThId){
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
    //sign this thread as unusable/overvwritable   
-   cdthreadsSystemArray[realidx].ID= CDTHREADID_ERROR; //delete this thread and sign as unusable/overwritable
-   cdthreadsSystemArray[realidx].Priority=CDTHREADPRIORITY_DISABLED;
-   cdthreadsSystemArray[realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
+   cdthreadsSystemArray[(uint16_t)realidx].ID= CDTHREADID_ERROR; //delete this thread and sign as unusable/overwritable
+   cdthreadsSystemArray[(uint16_t)realidx].Priority=CDTHREADPRIORITY_DISABLED;
+   cdthreadsSystemArray[(uint16_t)realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
    //destroy all messages associated to this thread
    cdmessage_deleteAllMsgWithThreadID( *pThId );
    *pThId = CDTHREADID_ERROR;   //force passed thread id to an unexisting thread id
@@ -528,7 +667,7 @@ int cdthread_DestroyThread(cdThreadID_t* pThId){
 
 
 
-/*! \fn int cdthread_IsDestroyed(cdThreadID_t pThId)
+/*! \fn sint_t cdthread_IsDestroyed(cdThreadID_t pThId)
    \author Dario Cortese
    \date 06-03-2013 updated 2015-11-04
    \brief checks if passed id is destroyed (invalid pThId or pThId signed as destroyed) and if it is then return true
@@ -536,46 +675,46 @@ int cdthread_DestroyThread(cdThreadID_t* pThId){
    \return true if pThId is invalid or thread indicated by pThId is signed as destroyed
    \version 1.00
 */
-int cdthread_isDestroyed(cdThreadID_t pThId){
+sint_t cdthread_isDestroyed(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return true to indicate that thread doesn't exist
    if( realidx<0 ) return TRUE; 
    //checks if thread was destroyed
-   if( cdthreadsSystemArray[realidx].ID == CDTHREADID_ERROR) return TRUE;
+   if( cdthreadsSystemArray[(uint16_t)realidx].ID == CDTHREADID_ERROR) return TRUE;
    //checks if pointed thread by pThId is different by pThId; this operation have a very limited utility because happens only if allocated thread is a different type thread, so removed
    //if( cdthreadsSystemArray[realidx].ID != pThId) return true;
    return FALSE;   //to indicates that thread exist
 }
 
 
-
-/*! \fn int cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction)
- *  \author Dario Cortese
- *  \date 2016-05-22
- *  \brief destroy allocated thread and assign a new one
- *  this function test if the actual id is free, if not then destroy that id and thread, 
- *  after creates a new id and assign indicated thread function 
- *  \param pThId is pointer to the cdthread variable that contain the (id)
- *  \param ptrFunction is the function pointer to a function that is the called thread_function when thread run; if no function pass CDTHREADFUNCTION_NOFUNCTION
- *  \return true if new thread created or false if happened a problem as thread id also used (not destroyed) or noone id is free for a new thread
- *  \version 1.00
-*/
-int cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
-      if ( ! cdthread_isDestroyed( *pThId))
-          cdthread_DestroyThread( pThId );
-                  
-    return cdthread_new(pThId, ptrFunction);
-}
-
-
+//DEPRECATED 2019-03-10
+///-*! \fn sint_t cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction)
+// *  \author Dario Cortese
+// *  \date 2016-05-22
+// *  \brief destroy allocated thread and assign a new one
+// *  this function test if the actual id is free, if not then destroy that id and thread, 
+// *  after creates a new id and assign indicated thread function 
+// *  \param pThId is pointer to the cdthread variable that contain the (id)
+// *  \param ptrFunction is the function pointer to a function that is the called thread_function when thread run; if no function pass CDTHREADFUNCTION_NOFUNCTION
+// *  \return true if new thread created or false if happened a problem as thread id also used (not destroyed) or noone id is free for a new thread
+// *  \version 1.00
+//*-/
+//sint_t cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
+//      if ( ! cdthread_isDestroyed( *pThId))
+//          cdthread_DestroyThread( pThId );
+//                  
+//    return cdthread_new(pThId, ptrFunction);
+//}
 
 
 
 
 
-/*! \fn int cdthread_signAsFirtsTime(cdThreadID_t pThId)
+
+
+/*! \fn sint_t cdthread_signAsFirtsTime(cdThreadID_t pThId)
    \author Dario Cortese
    \date 09-08-2012 updated 2015-11-04
    \brief set firsttime flag as true for indicated thread
@@ -584,24 +723,72 @@ int cdthread_reassign(cdThreadID_t* pThId, cdtreadFunctionType ptrFunction){
    \return false if a error accurred, or true if indicated thread has been signed as firsttime 
    \version 1.00
 */
-int cdthread_signAsFirtsTime(cdThreadID_t pThId){
+sint_t cdthread_signAsFirtsTime(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
    //checks id thread is destroyed and if destroyed return false
-   if(cdthreadsSystemArray[realidx].ID == CDTHREADID_ERROR) return FALSE;
+   if(cdthreadsSystemArray[(uint16_t)realidx].ID == CDTHREADID_ERROR) return FALSE;
 
-   cdthreadsSystemArray[realidx].isTheFirstTime= TRUE; 
+   cdthreadsSystemArray[(uint16_t)realidx].isTheFirstTime= TRUE; 
    return TRUE;
 } 
 
 
 
-/*! \fn int cdthread_Enable(cdThreadID_t pThId, int pPriority)
+/*! \fn sint_t cdthread_ISR_FAST_enable(cdThreadID_t pThId)
    \author Dario Cortese
-   \date 09-08-2012 updated 2015-11-04
+   \date 15-09-2019 updated 15-09-2019
+   \brief enable indicated Thread with base/default priority without any check about validity
+   sign inside cdthreadsSystemArray at indicated position that Priority = CDTHREADPRIORITY_ENABLED.
+   \param pThId is cdthread (id) to enable
+   \return false if a error accurred, or true if indicated thread has been disabled 
+   \version 1.00
+*/
+sint_t cdthread_ISR_FAST_enable(cdThreadID_t pThId){
+   //only valid and managed thread allowed
+   if((pThId < 1) || pThId > CDTHREAD_MAX_NUM_THREADS  )
+       return FALSE;
+   
+   pThId--; //become real index for managed thread
+   cdthreadsSystemArray[(uint16_t)pThId].Priority= CDTHREADPRIORITY_ENABLED; 
+   //cdthreadsSystemArray[(unsigned)realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
+   return TRUE;
+} 
+
+
+
+
+/*! \fn sint_t cdthread_Enable(cdThreadID_t pThId)
+   \author Dario Cortese
+   \date 15-09-2019 updated 15-09-2019
+   \brief enable indicated Thread with base/default priority 
+   sign inside cdthreadsSystemArray at indicated position that Priority = CDTHREADPRIORITY_ENABLED.
+   \param pThId is cdthread (id) to enable
+   \return false if a error accurred, or true if indicated thread has been disabled 
+   \version 1.00
+*/
+sint_t cdthread_Enable(cdThreadID_t pThId){
+   cdThreadID_t realidx;
+   //convert pThId in real index for cdthreadsSystemArray
+   realidx = cdthread_getArrayIdxFromID(pThId);
+   //if an error happened then return false
+   if( realidx<0 )
+       return FALSE; 
+
+   cdthreadsSystemArray[(uint16_t)realidx].Priority= CDTHREADPRIORITY_ENABLED; 
+   //cdthreadsSystemArray[(unsigned)realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
+   return TRUE;
+} 
+
+
+
+
+/*! \fn sint_t cdthread_Enable_with_priority(cdThreadID_t pThId, sint_t pPriority)
+   \author Dario Cortese
+   \date 09-08-2012 updated 2019-03-15
    \brief enable indicated Thread with indicated priority 
    sign inside cdthreadsSystemArray at indicated position that Priority = pPriority.
    \n If pPriority is under 1 or is CDTHREADPRIORITY_DISABLED will be changed into equal to 1
@@ -610,23 +797,23 @@ int cdthread_signAsFirtsTime(cdThreadID_t pThId){
    \return false if a error accurred, or true if indicated thread has been disabled 
    \version 1.00
 */
-int cdthread_Enable(cdThreadID_t pThId, int pPriority){
+sint_t cdthread_Enable_with_priority(cdThreadID_t pThId, sint_t pPriority){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
    //ensure that pRiority is a valid priority to indicates enabled thread
-   if((pPriority == CDTHREADPRIORITY_DISABLED)||(pPriority < 1)) pPriority=CDTHREADPRIORITY_ENABLED;
-   //cdthreadsSystemArray[realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
-   cdthreadsSystemArray[realidx].Priority= pPriority; 
-   cdthreadsSystemArray[realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
+   if((pPriority == CDTHREADPRIORITY_DISABLED)||(pPriority < 1))
+       pPriority = CDTHREADPRIORITY_ENABLED;
+   cdthreadsSystemArray[(uint16_t)realidx].Priority= pPriority; 
+   cdthreadsSystemArray[(uint16_t)realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
    return TRUE;
 } 
 
 
 
-/*! \fn int cdthread_Disable(cdThreadID_t pThId)
+/*! \fn sint_T cdthread_Disable(cdThreadID_t pThId)
    \author Dario Cortese
    \date 09-08-2012 updated 2015-11-04
    \brief disable indicated Thread  and stop to wait a message for wakeup
@@ -635,19 +822,19 @@ int cdthread_Enable(cdThreadID_t pThId, int pPriority){
    \return false if a error accurred, or true if indicated thread has been disabled 
    \version 1.00
 */
-int cdthread_Disable(cdThreadID_t pThId){
+sint_t cdthread_Disable(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
-   cdthreadsSystemArray[realidx].Priority= CDTHREADPRIORITY_DISABLED; //disable this thread
-   cdthreadsSystemArray[realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
+   cdthreadsSystemArray[(uint16_t)realidx].Priority= CDTHREADPRIORITY_DISABLED; //disable this thread
+   cdthreadsSystemArray[(uint16_t)realidx].Wakeup = CDTHREADWAKEUP_DISABLED;
    return TRUE;
-} 
+}
 
 
-/*! \fn int cdthread_WaitMessage(cdThreadID_t pThId)
+/*! \fn sint_t cdthread_WaitMessage(cdThreadID_t pThId)
    \author Dario Cortese
    \date 05-11-2015 updated 2015-11-04
    \brief disable indicated Thread and set to wait a message; the thread will be called when a message arrive (wakeup one time) to manage the message, but not enabled
@@ -656,22 +843,47 @@ int cdthread_Disable(cdThreadID_t pThId){
    \return false if a error accurred, or true if indicated thread has been disabled
    \version 1.00
 */
-int cdthread_WaitMessage(cdThreadID_t pThId){
+sint_t cdthread_WaitMessage(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE;
-   cdthreadsSystemArray[realidx].Priority= CDTHREADPRIORITY_DISABLED; //disable this thread
-   cdthreadsSystemArray[realidx].Wakeup = CDTHREADWAKEUP_BYMESSAGE;
+   cdthreadsSystemArray[(uint16_t)realidx].Priority= CDTHREADPRIORITY_DISABLED; //disable this thread
+   cdthreadsSystemArray[(uint16_t)realidx].Wakeup = CDTHREADWAKEUP_BYMESSAGE;
    return TRUE;
 }
 
 
 
+/*! \fn sint_t cdthread_isWaitingMessage(cdThreadID_t pThId)
+   \author Dario Cortese
+   \date 18-03-2019 updated 2019-03-18
+   \brief checks if indicated Thread is disabled but waiting a message to wakeup
+   checks inside cdthreadsSystemArray at indicated position that Priority = CDTHREADPRIORITY_DISABLED
+   \n and  Wakeup = CDTHREADWAKEUP_BYMESSAGE
+   \param pThId is cdthread (id) to disable
+   \return true if enabled or false if disabled or an error happened
+   \version 1.00
+*/
+sint_t cdthread_isWaitingMessage(cdThreadID_t pThId){  
+   cdThreadID_t realidx;
+   //convert pThId in real index for cdthreadsSystemArray
+   realidx = cdthread_getArrayIdxFromID(pThId);
+   //if an error happened then return false
+   if( realidx<0 ) return FALSE; 
+   if( cdthreadsSystemArray[(uint16_t)realidx].Priority != CDTHREADPRIORITY_DISABLED){
+      return FALSE;
+   }
+   if( cdthreadsSystemArray[(uint16_t)realidx].Wakeup != CDTHREADWAKEUP_BYMESSAGE){
+      return FALSE;
+   }
+   return TRUE;
+}
 
 
-/*! \fn int cdthread_isEnabled(cdThreadID_t pThId)
+
+/*! \fn sint_t cdthread_isEnabled(cdThreadID_t pThId)
    \author Dario Cortese
    \date 10-08-2012 updated 2015-11-04
    \brief checks if indicated Thread is enabled (priority over 0) and return true if enabled 
@@ -680,20 +892,20 @@ int cdthread_WaitMessage(cdThreadID_t pThId){
    \return true if enabled or false if disabled or an error happened
    \version 1.00
 */
-int cdthread_isEnabled(cdThreadID_t pThId){
+sint_t cdthread_isEnabled(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
-   if( cdthreadsSystemArray[realidx].Priority == CDTHREADPRIORITY_DISABLED){
+   if( cdthreadsSystemArray[(uint16_t)realidx].Priority == CDTHREADPRIORITY_DISABLED){
       return FALSE;
    }
    return TRUE;
 } 
 
 
-/*! \fn int cdthread_getPriority(cdThreadID_t pThId)
+/*! \fn sint_t cdthread_getPriority(cdThreadID_t pThId)
    \author Dario Cortese
    \date 10-08-2012 updated 2015-11-04
    \brief return the actual pripority of thread
@@ -702,17 +914,17 @@ int cdthread_isEnabled(cdThreadID_t pThId){
    \return priority (0=disabled) or -1 if an error happened
    \version 1.00
 */
-int cdthread_getPriority(cdThreadID_t pThId){
+sint_t cdthread_getPriority(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return -1; 
-   return cdthreadsSystemArray[realidx].Priority;
+   return cdthreadsSystemArray[(uint16_t)realidx].Priority;
 } 
 
 
-/*! \fn int cdthread_getPrevExitStatus(cdThreadID_t pThId)
+/*! \fn sint_t cdthread_getPrevExitStatus(cdThreadID_t pThId)
    \author Dario Cortese
    \date 10-08-2012 updated 2015-11-04
    \brief return the last exit state; if hasn't a previous exit state (first time executed) return 0. if an error happen return -1
@@ -721,20 +933,20 @@ int cdthread_getPriority(cdThreadID_t pThId){
    \note is good practice don't use -1 in the possible exit state, use negative exit state for errors, and positive values for normal exit
    \version 1.00
 */
-int cdthread_getPrevExitStatus(cdThreadID_t pThId){
+sint_t cdthread_getPrevExitStatus(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return -1; 
-   return cdthreadsSystemArray[realidx].LastExitState; 
+   return cdthreadsSystemArray[(uint16_t)realidx].LastExitState; 
 } 
 
 
 
 
 
-/*! \fn int cdthread_isThrereMessages(cdThreadID_t pThId)
+/*! \fn sint_T cdthread_isThrereMessages(cdThreadID_t pThId)
    \author Dario Cortese
    \date 09-08-2012 updated 2015-11-04
    \brief check if indicated thread has almost a message
@@ -742,20 +954,68 @@ int cdthread_getPrevExitStatus(cdThreadID_t pThId){
    \return true if there is a message, otherwise return false if there isn't messages or an error accurred
    \version 1.00
 */
-int cdthread_isThrereMessages(cdThreadID_t pThId){
+sint_t cdthread_isThrereMessages(cdThreadID_t pThId){
    cdThreadID_t realidx;
    //convert pThId in real index for cdthreadsSystemArray
    realidx = cdthread_getArrayIdxFromID(pThId);
    //if an error happened then return false
    if( realidx<0 ) return FALSE; 
-   if( cdthreadsSystemArray[realidx].MessagesCounter> 0) return TRUE; 
+   if( cdthreadsSystemArray[(uint16_t)realidx].MessagesCounter> 0) return TRUE; 
    return FALSE;
 } 
 
 
 
 
-/*! \fn cdMessageID_t cdthread_getMessage(cdThreadID_t pThId)
+///*! \fn cdMessageID_t cdthread_getMessage(cdThreadID_t pThId)
+//   \author Dario Cortese
+//   \date 09-08-2012 updated 2015-11-04
+//   \brief return the first message (id) on msg queue of indicated thread, and sign it as readed; if there isn't or an error occours then return CDMESSAGEID_ERROR
+//   \param pThId is cdthread (id) to check
+//   \return the cdmessageid of available message, otherwise return CDMESSAGEID_ERROR if there isn't messages or an error accurred
+//   \note this function doesn't remove message from queue, and so if you doesn't remove it by cdthread_removeMessage(thid), next time reread this message
+//   \version 1.00
+//*/
+//cdMessageID_t cdthread_getMessage(cdThreadID_t pThId){
+//   cdThreadID_t realidx;
+//   cdMessageID_t msgid;
+//   //convert pThId in real index for cdthreadsSystemArray
+//   realidx = cdthread_getArrayIdxFromID(pThId);
+//   //if an error happened then return false
+//   if( realidx<0 ) return CDMESSAGEID_ERROR; 
+//   if( cdthreadsSystemArray[(unsigned)realidx].MessagesCounter> 0){
+//      msgid = cdthreadsSystemArray[(unsigned)realidx].FirstMsgID;
+//      //sign indicated message as readed, but doesnt remove it from queue
+//      cdmessage_sigMsgAsReaded( msgid);
+//      return msgid;
+//   }
+//   return CDMESSAGEID_ERROR;
+//} 
+//
+//
+///*! \fn sint_t cdthread_removeMessage(cdThreadID_t pThId)
+//   \author Dario Cortese
+//   \date 09-08-2012 updated 2015-11-04
+//   \brief remove first message from thread msg queue and return true if action has success, otherwise return false
+//   \param pThId is cdthread (id) to check
+//   \return true if remove msg from thread queue or false if an error happen
+//   \version 1.00
+//*/
+//sint_t cdthread_removeMessage(cdThreadID_t pThId){
+//   cdThreadID_t realidx;
+//   cdMessageID_t msgid;
+//   //convert pThId in real index for cdthreadsSystemArray
+//   realidx = cdthread_getArrayIdxFromID(pThId);
+//   //if an error happened then return false
+//   if( realidx<0 ) return FALSE; 
+//   if( cdthreadsSystemArray[(unsigned)realidx].MessagesCounter> 0){
+//      msgid = cdthreadsSystemArray[(unsigned)realidx].FirstMsgID;
+//      return cdmessage_deleteMsg( msgid );
+//   }
+//   return CDMESSAGEID_ERROR;
+//} 
+
+/*! \fn cdmessageData_t cdthread_getMessage(cdThreadID_t pThId)
    \author Dario Cortese
    \date 09-08-2012 updated 2015-11-04
    \brief return the first message (id) on msg queue of indicated thread, and sign it as readed; if there isn't or an error occours then return CDMESSAGEID_ERROR
@@ -764,46 +1024,54 @@ int cdthread_isThrereMessages(cdThreadID_t pThId){
    \note this function doesn't remove message from queue, and so if you doesn't remove it by cdthread_removeMessage(thid), next time reread this message
    \version 1.00
 */
-cdMessageID_t cdthread_getMessage(cdThreadID_t pThId){
+cdmessageData_t cdthread_getMessage(cdThreadID_t pThId){
+   cdmessageData_t msgD; 
+   cdMessageID_t idx;
    cdThreadID_t realidx;
-   cdMessageID_t msgid;
-   //convert pThId in real index for cdthreadsSystemArray
-   realidx = cdthread_getArrayIdxFromID(pThId);
-   //if an error happened then return false
-   if( realidx<0 ) return CDMESSAGEID_ERROR; 
-   if( cdthreadsSystemArray[realidx].MessagesCounter> 0){
-      msgid = cdthreadsSystemArray[realidx].FirstMsgID;
-      //sign indicated message as readed, but doesnt remove it from queue
-      cdmessage_sigMsgAsReaded( msgid);
-      return msgid;
-   }
-   return CDMESSAGEID_ERROR;
+   cdmessageStruct* MsgPtr;
+   cdThreadStruct_t* ThPtr;
+           
+   msgD.actMsg = CDMESSAGEID_ERROR;
+   msgD.msgData = 0;
+   msgD.msgInfo = 0;
+   msgD.msgSender = CDTHREADID_ERROR;
+   
+    //convert pThId in real index for cdthreadsSystemArray
+    realidx = cdthread_getArrayIdxFromID(pThId);
+    //if an error happened then return false
+    if( realidx<0 ) return msgD; //exit for error
+    //ThPtr = &cdthreadsSystemArray[(unsigned)realidx];
+    ThPtr = &cdthreadsSystemArray[0];
+    ThPtr += (uint16_t)realidx;
+    if( ThPtr->MessagesCounter > 0){
+        msgD.actMsg = ThPtr->FirstMsgID;
+        //sign indicated message as readed, but doesnt remove it from queue
+        //cdmessage_sigMsgAsReaded( msgid);
+        idx = cdmessage_getArrayIdxFromID(msgD.actMsg);
+        if(idx >= 0){
+            MsgPtr =  &cdmessagesSystemArray[(uint16_t)idx];
+            //useless: MsgPtr->State = CDMESSAGESTATE_READED;
+            msgD.msgData = MsgPtr->Data;
+            msgD.msgInfo = MsgPtr->Info;
+            msgD.msgSender = MsgPtr->cdthSenderID;
+           
+            //now delete the message
+            MsgPtr->State = CDMESSAGESTATE_DELETED;
+            if(ThPtr->MessagesCounter <= 1){
+                ThPtr->FirstMsgID = CDMESSAGEID_ERROR;
+                ThPtr->LastMsgID = CDMESSAGEID_ERROR;
+                ThPtr->MessagesCounter = 0;    
+            }else{ //if(ThPtr->MessagesCounter == 1)
+               //as is if(ThPtr->MessagesCounter > 1)
+               ThPtr->FirstMsgID = MsgPtr->NextMsgID; 
+               ThPtr->MessagesCounter--;
+            }
+        }else{ //if(idx >= 0)
+            msgD.actMsg = CDMESSAGEID_ERROR;
+        }
+    } //end if( cdthreadsSystemArray[(unsigned)realidx].MessagesCounter> 0)
+    return msgD;
 } 
-
-
-/*! \fn int cdthread_removeMessage(cdThreadID_t pThId)
-   \author Dario Cortese
-   \date 09-08-2012 updated 2015-11-04
-   \brief remove first message from thread msg queue and return true if action has success, otherwise return false
-   \param pThId is cdthread (id) to check
-   \return true if remove msg from thread queue or false if an error happen
-   \version 1.00
-*/
-int cdthread_removeMessage(cdThreadID_t pThId){
-   cdThreadID_t realidx;
-   cdMessageID_t msgid;
-   //convert pThId in real index for cdthreadsSystemArray
-   realidx = cdthread_getArrayIdxFromID(pThId);
-   //if an error happened then return false
-   if( realidx<0 ) return FALSE; 
-   if( cdthreadsSystemArray[realidx].MessagesCounter> 0){
-      msgid = cdthreadsSystemArray[realidx].FirstMsgID;
-      return cdmessage_deleteMsg( msgid );
-   }
-   return CDMESSAGEID_ERROR;
-} 
-
-
 
 #endif //_CDTHREAD_C_
 

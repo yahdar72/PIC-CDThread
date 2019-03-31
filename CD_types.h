@@ -6,9 +6,10 @@
 //// without written permission.                                        ////
 ////                                                                    ////
 //// Author: Dario Cortese                                              ////
-//// Client: myself                                                     ////
+//// Client: Mongoose srl (Mariano Cerbone)                             ////
 //// User: Dario Cortese                                                ////
-//// Created on 26/01/2012  upodated 01/11/2015                         ////
+//// Created on 26/01/2012                                              ////
+//// Modify on 10/02/2019 to be adapted at CCS compiler                 ////
 //// File: CD_types.h                                                   ////
 //// Description:                                                       ////
 ////    This file has the generic variable type, structure definition   ////
@@ -18,15 +19,15 @@
 ////////////////////////////////////////////////////////////////////////////
 
 
-#ifndef _CD_TYPES_H_
-#define _CD_TYPES_H_
+#ifndef __CD_TYPES_H_
+#define __CD_TYPES_H_
 
 #ifdef DOXYGEN
     #define section( YY )
 #endif
 
-//PLEASE INDICATE THE COMPILER
-#define  COMPILER_CCS
+//PLEASE INDICATE THE COMPILER                      
+#define  COMPILER_CCS 
 //#define  COMPILER_MICROCHIP
 //#define COMPILER_VISUALDSP
 
@@ -34,6 +35,11 @@
 //#define PLATFORM_PIC32
 //#define PLATFORM_PIC24
 #define PLATFORM_PICxx
+//#define PLATFORM_AVR
+//#define PLATFORM_BLACKFIN
+                                   
+
+
 
 
 #ifdef PLATFORM_PICxx
@@ -41,17 +47,71 @@
    //#define FALSE  FALSE
    #define NULL   0
    #ifdef COMPILER_CCS
+      #ifndef _STDINT
       typedef unsigned int8   uint8_t;
-      typedef signed int8     sint8_t;
-      typedef unsigned int16  uint16_t;
-      typedef signed int16    sint16_t;
-      typedef unsigned int32  uint32_t;
-      typedef signed int32    sint32_t;
-      typedef float32         float32_t;
-      typedef signed int8     sint_t;
+      typedef unsigned int16   uint16_t;
+      typedef unsigned int32   uint32_t;
+      #endif  //_STDINT    
+      typedef signed int8   sint8_t;
+      typedef signed int16   sint16_t;
+      typedef signed int32   sint32_t;
+      typedef float32   float32_t;
+      typedef signed int8   sint_t;
       typedef unsigned int8   uint_t;
+      typedef int bool;
    #endif //COMPILER_CCS
+   #ifdef COMPILER_MICROCHIP    
+    #include <stdint.h>
+
+      #define TRUE  0xffffffff
+      #define FALSE 0                                                          
+
+      typedef unsigned int8_t   uint_t;
+      typedef unsigned long  uint32_t;
+      typedef signed int8_t   sint_t;
+      typedef signed int8_t   sint8_t;
+      typedef signed int16_t   sint16_t;
+      typedef signed long    sint32_t;
+   #endif
 #endif //PLATFORM_PICxx
+
+
+#ifdef PLATFORM_PIC24
+   #ifdef COMPILER_CCS
+   #endif //COMPILER_CCS
+#endif //PLATFORM_PIC24
+
+#ifdef PLATFORM_PIC32
+#endif //PLATFORM_PIC32
+
+
+#ifdef PLATFORM_BLACKFIN
+   #ifdef COMPILER_VISUALDSP
+      #define TRUE   true
+      #define FALSE  false
+      //#define NULL   NULL
+      //for blackfin bf533 hw supported and managed
+      typedef unsigned char    uint8_t;
+      typedef signed char      sint8_t;
+      typedef unsigned short  uint16_t;
+      typedef signed short      sint16_t;
+      typedef unsigned int    uint32_t;
+      typedef signed int        sint32_t;
+      //typedef unsigned long   uint32_t;
+      //typedef signed long       sint32_t;
+      //for blackfin bf533 sw supported and managed
+      typedef unsigned long long  uint64_t;
+      typedef signed long long    sint64_t;
+      typedef float              float32_t;
+      typedef signed int   sint_t;
+      typedef unsigned int   uint_t;
+      //typedef double            float32_t;
+      //typedef unsigned fract      ufract16_t;
+      //typedef signed fract      sfract16_t;
+      //typedef unsigned long fract   ufract32_t;
+      //typedef signed long fract   sfract32_t;
+   #endif //COMPILER_VISUALDSP
+#endif //PLATFORM_BLACKFIN
 
 
 
@@ -121,6 +181,7 @@ typedef union uniInt32{
    }i8log;      //logical 
    uint8_t i8[4];
 
+#ifndef COMPILER_MICROCHIP
    struct{
       uint32_t bit0:1;
       uint32_t bit1:1;
@@ -155,7 +216,29 @@ typedef union uniInt32{
       uint32_t bit30:1;
       uint32_t bit31:1;
    }bits;
+#endif
 }TuniInt32_t; //end union uniInt32
 
 
-#endif //_CD_TYPES_H_
+#ifdef PLATFORM_BLACKFIN
+   //little-endian bytes ordering
+   typedef union uniInt64{
+      uint64_t i64;
+      struct{
+         uint32_t i32low;
+         uint32_t i32high;   
+      }i32log;      //logical
+      uint32_t i32[2];
+      struct{
+         uint16_t i16lower;
+         uint16_t i16low;
+         uint16_t i16high;   
+         uint16_t i16higher;   
+      }i16log;      //logical
+      uint16_t i16[4];
+      uint8_t i8[8];
+   }TuniInt64_t; //end union uniInt64
+#endif //PLATFORM_BLACKFIN
+
+
+#endif //__CD_TYPES_H_
